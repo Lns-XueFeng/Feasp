@@ -1,0 +1,136 @@
+<!-- 直接复制我之前写的ViliWeb
+但是将js部分略去, 本项目仅展示静态网页-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ViliWeb</title>
+    <style>
+        *{
+            margin: 0;
+            padding: 0;
+        }
+
+        li{
+            list-style: None;
+        }
+
+        html body{
+            background: lightyellow;
+            width: 60%;
+            margin: 0 auto;
+        }
+
+        .top-title{
+            width: 100%;
+            height: 80px;
+            background: lightpink;
+            text-align: center;
+            margin-top: 15px;
+            margin-bottom: 10px;
+            border: solid 5px black;
+            cursor: pointer;
+        }
+
+        .top-title h1{
+            line-height: 80px;
+            color: mediumpurple;
+        }
+
+        .top{
+            width: 100%;
+            height: auto;
+            text-align: center;
+        }
+
+        .fenlan div{
+            display: inline-block;
+            width: 15%;
+            height: auto;
+            background: lightpink;
+            margin-bottom: 10px;
+            margin-right: 10px;
+            padding: 10px;
+            border: solid 5px black;
+            box-sizing: border-box;
+            cursor: pointer;
+        }
+
+        .medium{
+            width: 100%;
+            height: 750px;
+            background: mediumpurple;
+            border: solid 5px black;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        .cartoon{
+            display: block;
+        }
+
+        .movies{
+            display: None;
+        }
+
+        .record{
+            display: None;
+        }
+
+        li {
+            display: inline-block;
+            width: 18%;
+            height: 350px;
+            background: lightpink;
+            margin-bottom: 10px;
+            margin-top: 10px;
+            margin-right: 10px;
+            padding: 10px;
+            border: solid 5px black;
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        .pages{
+            width: 100%;
+            height: 40px;
+            background: pink;
+            border: solid 5px black;
+            text-align: center;
+            cursor: pointer;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="top-title">
+        <h1>ViliWeb：我的影片库</h1>
+    </div>
+    <div class="top">
+        <!-- 分栏 -->
+        <div class="fenlan">
+            <div id="cartoon"><h2>动漫</h2></div>
+            <div id="movies"><h2>电影</h2></div>
+            <div id="record"><h2>纪录片</h2></div>
+        </div>
+    </div>
+
+    <div class="medium">
+        <!-- 动漫分栏 -->
+        <div class="cartoon">
+            <ul></ul>
+        </div>
+        <!-- 电影分栏 -->
+        <div class="movies">
+            <ul></ul>
+        </div>
+        <!-- 纪录片分栏 -->
+        <div class="record">
+            <ul></ul>
+        </div>
+    </div><br>
+    <div class="buttonDiv">
+        <button class="pages" data-page="0">下一页</button>
+    </div>
+</body>
+</html>
