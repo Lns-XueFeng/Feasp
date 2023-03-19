@@ -1,9 +1,9 @@
 # WebServer
 本项目利用Python Socket编写的支持多线程的微型Web Server（仅支持返回静态页面）
 
-## 简单运行
+## 命令行
 ```
-clone 
+clone https://github.com/Lns-XueFeng/WebServer.git
 cd WebServer
 python server.py
 ```
