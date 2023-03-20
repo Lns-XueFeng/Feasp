@@ -13,21 +13,19 @@ def make_response(request, headers=None):
     status = 200
     route, methods = routes.get(request.path, (None, None))
 
-    # 如果请求方法不被允许，返回 405 状态码
     if request.method not in methods:
         status = 405
         return_data = 'Method Not Allowed'
     else:
         return_data = route()   # 启动相应的视图函数
 
-    # 获取响应报文
     response = bytes(Response(return_data, headers=headers, status=status))
     return response
 
 
 def process_connect(data_socket):
     """处理客户端的连接"""
-    req_bytes = b''   # 请求报文数据
+    req_bytes = b''
     while True:
         recv_data = data_socket.recv(BUFFER_SIZE)
 
