@@ -57,8 +57,8 @@ def fire_server():
     print()
     print("            Welcome to use the Web Server!")
     print("                     Version 1.0")
-    print("                         FooLo")
-    print(f"  Server fire success, On {PORT} port waiting client...")
+    print("                       XueFeng")
+    print(f"Server fire success, Please click http://127.0.0.1:{PORT}")
     print("___________________________________________________________")
 
     while True:
