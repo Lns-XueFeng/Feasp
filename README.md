@@ -1,4 +1,4 @@
-# WebServer
+# ViliviliWeb
 本项目利用Python Socket编写的支持多线程的微型WebServer程序（仅支持返回静态页面）
 
 ## 命令行
