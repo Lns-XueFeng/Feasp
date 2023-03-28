@@ -14,18 +14,18 @@ def string():
 
 
 @app.route("/dict", methods=["GET"])
-def dic():
+def dict_():
     return {"H": "L", "P": "D"}
 
 
 @app.route("/list", methods=["GET"])
-def lis():
+def list_():
     return ["A", "P", "k", "G"]
 
 
 @app.route("/", methods=["GET"])
 def index():
-    return render_template("index.html", base_dir)
+    return render_template("index.html")
 
 
 if __name__ == "__main__":
