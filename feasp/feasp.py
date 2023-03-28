@@ -1,4 +1,5 @@
 import os
+import threading
 
 from werkzeug.wrappers import Request, Response
 
@@ -11,6 +12,10 @@ http_500 = Response('<html><body>Server Internal Error</body></html>', mimetype=
 http_500.status = "500 Server Internal Error"
 
 
+global_var = {}
+http_local = threading.local()
+
+
 class Method:
     GET = "GET"
     POST = "POST"
@@ -18,8 +23,8 @@ class Method:
     PUT = "PUT"
 
 
-def render_template(filename, base_dir):
-    filepath = os.path.join(base_dir, "template", filename)
+def render_template(filename):
+    filepath = os.path.join(global_var["base_dir"], "template", filename)
     with open(filepath, 'r') as fp:
         content = fp.read()
     return content
@@ -30,6 +35,7 @@ class Application:
     def __init__(self, filename):
         self.url_func_map = {}
         self.base_dir = os.path.abspath(os.path.dirname(filename))
+        global_var["base_dir"] = self.base_dir
 
     def dispatch(self, path, method):
         values = self.url_func_map.get(path, None)
@@ -73,8 +79,9 @@ class Application:
         return decorator
 
     def wsgi_apl(self, environ, start_response):
-        request = Request(environ)
-        response = self.dispatch(request.path, request.method)
+        http_local.request = Request(environ)
+        response = self.dispatch(
+            http_local.request.path, http_local.request.method)
         return response(environ, start_response)
 
     def run(self):
