@@ -110,4 +110,3 @@ class Feasp:
     def run(self):
         from werkzeug.serving import run_simple
         run_simple("127.0.0.1", 8000, self.wsgi_apl)
-
