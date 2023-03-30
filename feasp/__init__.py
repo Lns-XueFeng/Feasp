@@ -1,7 +1,7 @@
-from .feasp import Application, render_template
+from .feasp import Feasp, render_template
 
 
 __init__ = [
-    Application,
+    Feasp,
     render_template,
 ]
