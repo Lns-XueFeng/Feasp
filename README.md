@@ -5,9 +5,9 @@ feasp：一个简易的Web框架，仅供学习交流
 
 ### 使用如下
 ```python
-from feasp import Application
+from feasp import Feasp
 
-app = Application(__name__)
+app = Feasp(__name__)
 
 @app.route("/", methods=["GET"])
 def index():
@@ -16,3 +16,4 @@ def index():
 if __name__ == "__main__":
     app.run()
 ```
+
