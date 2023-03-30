@@ -1,9 +1,9 @@
 import os
 
-from feasp import Application, render_template
+from feasp import Feasp, render_template
 
 
-app = Application(__name__)
+app = Feasp(__name__)
 
 base_dir = os.path.abspath(os.path.dirname(__name__))
 
