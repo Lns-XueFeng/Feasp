@@ -4,10 +4,6 @@ import threading
 from werkzeug.wrappers import Request as BaseRequest, Response as BaseResponse
 
 
-global_var = {}   # 存一些需要全局使用的变量
-http_local = threading.local()
-
-
 def render_template(filename):
     filepath = os.path.join(global_var["user_base_dir"], "template", filename)
     with open(filepath, 'r') as fp:
@@ -32,20 +28,20 @@ class Response(BaseResponse):
     pass
 
 
-class Error:
-    http_404 = Response("<html><body>Not Found 404</body></html>", mimetype="text/html")
-    http_404.status = "404 Not Found"
-    http_405 = Response('<html><body>Method Not Allowed</body></html>', mimetype="text/html")
-    http_405.status = "405 Method Not Allowed"
-    http_500 = Response('<html><body>Server Internal Error</body></html>', mimetype="text/html")
-    http_500.status = "500 Server Internal Error"
-
-
 class Method:
     GET = "GET"
     POST = "POST"
     DELETE = "DELETE"
     PUT = "PUT"
+
+
+class Error:
+    http_404 = Response("Not Found 404", mimetype="text/html")
+    http_404.status = "404 Not Found"
+    http_405 = Response("Method Not Allowed", mimetype="text/html")
+    http_405.status = "405 Method Not Allowed"
+    http_500 = Response("Server Internal Error", mimetype="text/html")
+    http_500.status = "500 Server Internal Error"
 
 
 class Feasp:
@@ -107,6 +103,10 @@ class Feasp:
             http_local.request.path, http_local.request.method)
         return response(environ, start_response)
 
-    def run(self):
+    def run(self, host, port):
         from werkzeug.serving import run_simple
-        run_simple("127.0.0.1", 8000, self.wsgi_apl)
+        run_simple(host, port, self.wsgi_apl)
+
+
+global_var = dict()   # 存一些需要全局使用的变量
+http_local = threading.local()   # 保证多线程请求的线程安全
