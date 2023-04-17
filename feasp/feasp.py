@@ -19,6 +19,7 @@ def deal_favicon():
 
 
 class Request:
+
     def __init__(self, environ):
         self.protocol = environ.get('SERVER_PROTOCOL', None)
         self.method = environ.get("REQUEST_METHOD", None)
@@ -44,9 +45,9 @@ class Response:
         self.body = body   # 响应体
         self.status = status   # 状态码
         self.mimetype = mimetype   # 文本类型
-        self.headers = {
+        self.headers = {   # 响应头
             "Content-Type": f"{self.mimetype}; charset=utf-8",
-        }   # 响应头
+        }
 
     def __call__(self, environ, start_response):
         start_response(
