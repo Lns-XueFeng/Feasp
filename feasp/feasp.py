@@ -1,8 +1,6 @@
 import os
 import threading
 
-from werkzeug.wrappers import Request as BaseRequest, Response as BaseResponse
-
 
 def render_template(filename):
     filepath = os.path.join(global_var["user_base_dir"], "template", filename)
@@ -20,12 +18,45 @@ def deal_favicon():
     return Error.http_404
 
 
-class Request(BaseRequest):
-    pass
+class Request:
+    def __init__(self, environ):
+        self.protocol = environ.get('SERVER_PROTOCOL', None)
+        self.method = environ.get("REQUEST_METHOD", None)
+        self.path = environ.get("PATH_INFO", None)
+        self.args = environ.get("QUERY_STRING", None)
+        self.uri = environ.get("REQUEST_URI", None)
+
+    def __repr__(self):
+        return f"<{type(self).__name__} {self.method} {self.protocol} {self.path})"
 
 
-class Response(BaseResponse):
-    pass
+class Response:
+
+    reason_phrase = {
+        200: "OK",
+        302: "FOUND",
+        404: "Not Found",
+        405: "Method Not Allowed",
+        500: "Server Internal Error",
+    }
+
+    def __init__(self, body, mimetype, status=200):
+        self.body = body   # 响应体
+        self.status = status   # 状态码
+        self.mimetype = mimetype   # 文本类型
+        self.headers = {
+            "Content-Type": f"{self.mimetype}; charset=utf-8",
+        }   # 响应头
+
+    def __call__(self, environ, start_response):
+        start_response(
+            f"{self.status} {self.reason_phrase[self.status]}",
+            [(k, v) for k, v in self.headers.items()]
+        )
+        return [self.body.encode("utf-8")]
+
+    def __repr__(self):
+        return f"<{type(self).__name__} {self.mimetype} {self.status} {self.reason_phrase}"
 
 
 class Method:
@@ -36,12 +67,12 @@ class Method:
 
 
 class Error:
-    http_404 = Response("Not Found 404", mimetype="text/html")
-    http_404.status = "404 Not Found"
-    http_405 = Response("Method Not Allowed", mimetype="text/html")
-    http_405.status = "405 Method Not Allowed"
-    http_500 = Response("Server Internal Error", mimetype="text/html")
-    http_500.status = "500 Server Internal Error"
+    http_404 = Response("<h1>Not Found 404</h1>", mimetype="text/html")
+    http_404.status = 404
+    http_405 = Response("<h1>Method Not Allowed</h1>", mimetype="text/html")
+    http_405.status = 405
+    http_500 = Response("<h1>Server Internal Error</h1>", mimetype="text/html")
+    http_500.status = 500
 
 
 class Feasp:
