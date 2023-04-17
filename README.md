@@ -11,9 +11,8 @@ app = Feasp(__name__)
 
 @app.route("/", methods=["GET"])
 def index():
-    return "Hello World !"
+    return "Hello Feasp !"
 
 if __name__ == "__main__":
     app.run("127.0.0.1", 8000)
 ```
-
