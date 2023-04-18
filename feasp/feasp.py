@@ -6,12 +6,49 @@ class NotFoundImage(Exception):
     pass
 
 
+class NotFoundViewFunc(Exception):
+    pass
+
+
+def redirect(request_url):
+    """
+      提供一个方便重定向的函数
+      传入一个需要跳转的路径, 此函数生成对应的响应
+    """
+    url_func_map = global_var["url_func_map"]
+    if request_url in url_func_map:
+        view_func = url_func_map[request_url][1]
+        return view_func()
+    raise NotFoundViewFunc("not found view function")
+
+
+
+def url_for(endpoint=None, relative_path=None):
+    """
+      提供一个更方便构建文件路径的函数
+      endpoint: 端点, 可以是static, templates, view_func_name
+      relative_path: 为相对应端点的相对路径
+      目前不支持在模板中使用, 仅支持在视图函数中使用
+    """
+    # 找到要url_for到的视图函数的请求路径
+    if not endpoint is None and relative_path is None:
+        url_func_map = global_var["url_func_map"]
+        for path, values in url_func_map.items():
+            if endpoint in values:
+                return path
+        raise NotFoundViewFunc("not found view function")
+    # 处理模板内的url_for
+    if endpoint in ("static", "templates") and relative is not None:
+        pass
+
+
 def render_template(filename):
     """
       渲染templates下的html文件
       因此你需要将所有html文件放在templates目录中
       filename为html文件在templates中的相对路径
       你应该这样传入filename：/index.html 或者 index.html
+      后续增加可传变量、引擎解析等
     """
     if filename[0] == "/":
         filename = filename[1:]
@@ -103,6 +140,10 @@ class Method:
 
 
 class Error:
+
+    """ Error规定了:
+      资源未找到、方法不允许、服务器错误三种响应错误 """
+
     http_404 = Response("<h1>Not Found 404</h1>", mimetype="text/html")
     http_404.status = 404
     http_405 = Response("<h1>Method Not Allowed</h1>", mimetype="text/html")
@@ -130,20 +171,24 @@ class Feasp:
         # 用户的包文件路径
         self.user_base_dir = os.path.abspath(os.path.dirname(filename))
         global_var["user_base_dir"] = self.user_base_dir
+        # self.url_func_map 传入全局字典
+        global_var["url_func_map"] = self.url_func_map
 
     def dispatch(self, path, method):
         """ 处理请求并返回对应视图函数的响应 """
 
-        if ".jpg" in path or ".png" in path or ".ico" in path:   # 处理图片相关请求
-            mimetype = "image/x-icon"
-            content = deal_images(path)
-            return Response(content, mimetype=mimetype)
-
+        # 处理图片相关请求
+        for bq in (".ico", ".jpg", ".png"):
+            if bq in path:
+                mimetype = "image/x-icon"
+                content = deal_images(path)
+                return Response(content, mimetype=mimetype)
+        # 处理视图函数相关请求
         values = self.url_func_map.get(path, None)
         if values is None:
             return Error.http_404
 
-        view_func, methods = values
+        endpoint, view_func, methods = values
         view_func_return = view_func()
         if method not in methods:
             return Error.http_405
@@ -175,7 +220,8 @@ class Feasp:
             def wrapper(*args, **kwargs):
                 return func(*args, **kwargs)
 
-            self.url_func_map[path] = (func, methods)
+            endpoint = func.__name__
+            self.url_func_map[path] = (endpoint, func, methods)
             return wrapper
         return decorator
 
