@@ -22,7 +22,6 @@ def redirect(request_url):
     raise NotFoundViewFunc("not found view function")
 
 
-
 def url_for(endpoint=None, relative_path=None):
     """
       提供一个更方便构建文件路径的函数
@@ -220,7 +219,7 @@ class Feasp:
             def wrapper(*args, **kwargs):
                 return func(*args, **kwargs)
 
-            endpoint = func.__name__
+            endpoint = func.__name__   # 此处端点为视图函数的名称
             self.url_func_map[path] = (endpoint, func, methods)
             return wrapper
         return decorator
