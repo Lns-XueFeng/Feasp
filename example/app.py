@@ -5,8 +5,6 @@ from feasp import Feasp, render_template
 
 app = Feasp(__name__)
 
-base_dir = os.path.abspath(os.path.dirname(__name__))
-
 
 @app.route("/string", methods=["GET"])
 def string():
@@ -21,6 +19,11 @@ def dict_():
 @app.route("/list", methods=["GET"])
 def list_():
     return ["A", "P", "k", "G"]
+
+
+@app.route("/image", methods=["GET"])
+def image():
+    return render_template("image.html")
 
 
 @app.route("/", methods=["GET"])
