@@ -1,6 +1,5 @@
-import os
-
-from feasp import Feasp, render_template
+from feasp import Feasp
+from feasp import render_template, url_for, redirect
 
 
 app = Feasp(__name__)
@@ -24,6 +23,11 @@ def list_():
 @app.route("/image", methods=["GET"])
 def image():
     return render_template("image.html")
+
+
+@app.route("/redirect", methods=["GET"])
+def redirect_():
+    return redirect(url_for("index"))
 
 
 @app.route("/", methods=["GET"])
