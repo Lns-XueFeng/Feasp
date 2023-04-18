@@ -2,23 +2,52 @@ import os
 import threading
 
 
+class NotFoundImage(Exception):
+    pass
+
+
 def render_template(filename):
-    filepath = os.path.join(global_var["user_base_dir"], "template", filename)
+    """
+      渲染templates下的html文件
+      因此你需要将所有html文件放在templates目录中
+      filename为html文件在templates中的相对路径
+      你应该这样传入filename：/index.html 或者 index.html
+    """
+    if filename[0] == "/":
+        filename = filename[1:]
+
+    filepath = os.path.join(global_var["user_base_dir"], "templates", filename)
     with open(filepath, 'r') as fp:
         content = fp.read()
     return content
 
 
-def deal_favicon():
-    filepath = os.path.join(global_var["user_base_dir"], "static", "favicon.ico")
+def deal_images(image_path):
+    """
+      处理图片请求相关, 支持jpg, png, ico
+      image_path: static目录下的文件路径
+      比如example/static下的favicon。ico
+      你应该在html中这样写：/favicon.ico 或者 favicon.ico
+    """
+
+    if image_path[0] == "/":
+        image_path = image_path[1:]
+
+    filepath = os.path.join(global_var["user_base_dir"], "static", image_path)
     if os.path.exists(filepath):
         with open(filepath, 'rb') as fp:
             content = fp.read()
         return content
-    return Error.http_404
+    raise NotFoundImage(f"not found {image_path}")
 
 
 class Request:
+
+    """ Request为解析类, 解析WSGI中的HTTP参数
+      self.protocol: http协议类型
+      self.method: http请求方法
+      self.path: http请求路径(资源路径)
+      self.args: url中的参数 """
 
     def __init__(self, environ):
         self.protocol = environ.get('SERVER_PROTOCOL', None)
@@ -28,10 +57,13 @@ class Request:
         self.uri = environ.get("REQUEST_URI", None)
 
     def __repr__(self):
-        return f"<{type(self).__name__} {self.method} {self.protocol} {self.path})"
+        return f"<{type(self).__name__} {self.method} {self.protocol} {self.path}>"
 
 
 class Response:
+
+    """ Response为响应类, 基于WSGI的包装返回
+      支持bytes以及非bytes的包装返回 """
 
     reason_phrase = {
         200: "OK",
@@ -54,10 +86,13 @@ class Response:
             f"{self.status} {self.reason_phrase[self.status]}",
             [(k, v) for k, v in self.headers.items()]
         )
+
+        if isinstance(self.body, bytes):
+            return [self.body]
         return [self.body.encode("utf-8")]
 
     def __repr__(self):
-        return f"<{type(self).__name__} {self.mimetype} {self.status} {self.reason_phrase}"
+        return f"<{type(self).__name__} {self.mimetype} {self.status} {self.reason_phrase[self.status]}>"
 
 
 class Method:
@@ -78,15 +113,32 @@ class Error:
 
 class Feasp:
 
+    """ Feasp: 一个简易的Web框架, 基于WSGI规范, 仅用来学习交流
+      实现了路由注册, WSGI Application, 请求的分发, 并保证多线程情况下的请求-响应的安全返回
+      使用示例:
+      from feasp import Feasp
+
+      app = Feasp(__name)
+
+      @app.route('/', methods=['GET'])
+      def index():
+          return 'Hello Feasp !' """
+
     def __init__(self, filename):
         # url与view_func的映射
-        self.url_func_map = {"/favicon.ico": (deal_favicon, ["GET"])}
+        self.url_func_map = dict()
         # 用户的包文件路径
         self.user_base_dir = os.path.abspath(os.path.dirname(filename))
         global_var["user_base_dir"] = self.user_base_dir
 
     def dispatch(self, path, method):
         """ 处理请求并返回对应视图函数的响应 """
+
+        if ".jpg" in path or ".png" in path or ".ico" in path:   # 处理图片相关请求
+            mimetype = "image/x-icon"
+            content = deal_images(path)
+            return Response(content, mimetype=mimetype)
+
         values = self.url_func_map.get(path, None)
         if values is None:
             return Error.http_404
@@ -98,8 +150,6 @@ class Feasp:
 
         if isinstance(view_func_return, str):
             mimetype = "text/html"
-        elif isinstance(view_func_return, bytes):
-            mimetype = "image/x-icon"
         elif isinstance(view_func_return, dict):
             temp = "{"
             for k, v in view_func_return.items():
@@ -131,9 +181,9 @@ class Feasp:
 
     def wsgi_apl(self, environ, start_response):
         http_local.request = Request(environ)
-        response = self.dispatch(
+        http_local.response = self.dispatch(
             http_local.request.path, http_local.request.method)
-        return response(environ, start_response)
+        return http_local.response(environ, start_response)
 
     def run(self, host, port):
         from werkzeug.serving import run_simple
