@@ -1,3 +1,9 @@
+"""
+Author: Lns-XueFeng
+Create Time: 2023.03.27
+"""
+
+
 import os
 import threading
 
@@ -10,35 +16,48 @@ class NotFoundViewFunc(Exception):
     pass
 
 
+class UrlForError(Exception):
+    pass
+
+
 def redirect(request_url):
     """
       提供一个方便重定向的函数
       传入一个需要跳转的路径, 此函数生成对应的响应
     """
-    url_func_map = global_var["url_func_map"]
+
+    url_func_map = _global_var["url_func_map"]
     if request_url in url_func_map:
         view_func = url_func_map[request_url][1]
         return view_func()
     raise NotFoundViewFunc("not found view function")
 
 
-def url_for(endpoint=None, relative_path=None):
+def url_for(endpoint, relative_path=None):
     """
       提供一个更方便构建文件路径的函数
       endpoint: 端点, 可以是static, templates, view_func_name
       relative_path: 为相对应端点的相对路径
+      你应该这样传入relative_path：/index.html 或者 index.html 或者不传
+
       目前不支持在模板中使用, 仅支持在视图函数中使用
     """
+
     # 找到要url_for到的视图函数的请求路径
     if not endpoint is None and relative_path is None:
-        url_func_map = global_var["url_func_map"]
+        url_func_map = _global_var["url_func_map"]
         for path, values in url_func_map.items():
             if endpoint in values:
                 return path
         raise NotFoundViewFunc("not found view function")
-    # 处理模板内的url_for
-    if endpoint in ("static", "templates") and relative is not None:
-        pass
+    # 以下代码需要等到支持模板渲染时才可用
+    if endpoint in ("static", "templates") and relative_path is not None:
+        if relative_path[0] == "/":
+            relative_path = relative_path[1:]
+
+        abspath = os.path.join(_global_var["user_pkg_abspath"], endpoint, relative_path)
+        return abspath
+    raise UrlForError("url_for func error")
 
 
 def render_template(filename):
@@ -49,10 +68,11 @@ def render_template(filename):
       你应该这样传入filename：/index.html 或者 index.html
       后续增加可传变量、引擎解析等
     """
+
     if filename[0] == "/":
         filename = filename[1:]
 
-    filepath = os.path.join(global_var["user_base_dir"], "templates", filename)
+    filepath = os.path.join(_global_var["user_pkg_abspath"], "templates", filename)
     with open(filepath, 'r') as fp:
         content = fp.read()
     return content
@@ -69,12 +89,16 @@ def deal_images(image_path):
     if image_path[0] == "/":
         image_path = image_path[1:]
 
-    filepath = os.path.join(global_var["user_base_dir"], "static", image_path)
+    filepath = os.path.join(_global_var["user_pkg_abspath"], "static", image_path)
     if os.path.exists(filepath):
         with open(filepath, 'rb') as fp:
             content = fp.read()
         return content
     raise NotFoundImage(f"not found {image_path}")
+
+
+class Template:
+    pass
 
 
 class Request:
@@ -83,14 +107,23 @@ class Request:
       self.protocol: http协议类型
       self.method: http请求方法
       self.path: http请求路径(资源路径)
-      self.args: url中的参数 """
+      self.args: url中的参数
+      self.cookie: 存储已解析浏览器的cookie """
 
     def __init__(self, environ):
-        self.protocol = environ.get('SERVER_PROTOCOL', None)
-        self.method = environ.get("REQUEST_METHOD", None)
-        self.path = environ.get("PATH_INFO", None)
-        self.args = environ.get("QUERY_STRING", None)
-        self.uri = environ.get("REQUEST_URI", None)
+        self.protocol = environ.get('SERVER_PROTOCOL')
+        self.method = environ.get("REQUEST_METHOD")
+        self.path = environ.get("PATH_INFO")
+        self.qs = environ.get("QUERY_STRING")
+        self.uri = environ.get("REQUEST_URI")
+
+        http_cookie = environ.get("HTTP_COOKIE")
+        self.cookie = dict()   # 存储浏览器返回的cookie
+        if http_cookie is not None:
+            cl = http_cookie.split(" ")
+            for kv in cl:
+                k, v = tuple(kv.split("="))
+                self.cookie[k] = v
 
     def __repr__(self):
         return f"<{type(self).__name__} {self.method} {self.protocol} {self.path}>"
@@ -118,6 +151,16 @@ class Response:
         }
 
     def __call__(self, environ, start_response):
+        global session
+        if len(session) > 0:
+            cookie_str = ""
+            for k, v in session.items():
+                cookie_str = cookie_str + f"{k}={v} "
+            self.headers.update(
+                {"Set-Cookie": f"{cookie_str}"}
+            )
+        session.clear()   # 设置完后清空session: 之前是将session重新赋值{}, 这样并不能清空session
+
         start_response(
             f"{self.status} {self.reason_phrase[self.status]}",
             [(k, v) for k, v in self.headers.items()]
@@ -158,7 +201,7 @@ class Feasp:
       使用示例:
       from feasp import Feasp
 
-      app = Feasp(__name)
+      app = Feasp(__name__)
 
       @app.route('/', methods=['GET'])
       def index():
@@ -168,10 +211,12 @@ class Feasp:
         # url与view_func的映射
         self.url_func_map = dict()
         # 用户的包文件路径
-        self.user_base_dir = os.path.abspath(os.path.dirname(filename))
-        global_var["user_base_dir"] = self.user_base_dir
+        self.user_pkg_abspath = os.path.abspath(os.path.dirname(filename))
+        _global_var["user_pkg_abspath"] = self.user_pkg_abspath
         # self.url_func_map 传入全局字典
-        global_var["url_func_map"] = self.url_func_map
+        _global_var["url_func_map"] = self.url_func_map
+        # 待存储request中的cookie
+        self.cookie = dict()
 
     def dispatch(self, path, method):
         """ 处理请求并返回对应视图函数的响应 """
@@ -225,15 +270,25 @@ class Feasp:
         return decorator
 
     def wsgi_apl(self, environ, start_response):
-        http_local.request = Request(environ)
-        http_local.response = self.dispatch(
-            http_local.request.path, http_local.request.method)
-        return http_local.response(environ, start_response)
+        _http_local.request = Request(environ)
+        self.cookie = _http_local.request.cookie   # 传递cookie
+
+        _http_local.response = self.dispatch(
+            _http_local.request.path, _http_local.request.method)
+        return _http_local.response(environ, start_response)
+
+    # 仅支持单线程
+    # def run(self, host, port):
+    #     from wsgiref.simple_server import make_server
+    #     with make_server(host, port, self.wsgi_apl) as httpd:
+    #         print(f"* Running on http://{host}:{port}")
+    #         httpd.serve_forever()
 
     def run(self, host, port):
         from werkzeug.serving import run_simple
         run_simple(host, port, self.wsgi_apl)
 
 
-global_var = dict()   # 存一些需要全局使用的变量
-http_local = threading.local()   # 保证多线程请求的线程安全
+_global_var = dict()   # 存一些需要全局使用的变量
+_http_local = threading.local()   # 保证多线程请求的线程安全
+session = dict()   # session会话: 用户用于让浏览器设置cookie
