@@ -1,5 +1,5 @@
 from feasp import Feasp
-from feasp import render_template, url_for, redirect
+from feasp import render_template, url_for, redirect, session
 
 
 app = Feasp(__name__)
@@ -28,6 +28,25 @@ def image():
 @app.route("/redirect", methods=["GET"])
 def redirect_():
     return redirect(url_for("index"))
+
+
+@app.route("/set_cookies", methods="GET")
+def set_cookies():
+    # 通过session来让浏览器设置cookie
+    session["name"] = "xue"
+    session["ppp"] = "ppp"
+    return "Set Cookies"
+
+
+@app.route("/show_cookies", methods=["GET"])
+def show_cookies():
+    # 通过app.cookie来拿到浏览器传递的cookie
+    if len(app.cookie) > 0:
+        cookies = ""
+        for k, v in app.cookie.items():
+            cookies += f"{k}={v};"
+        return f"Show Cookies: {cookies}"
+    return "No Cookies"
 
 
 @app.route("/", methods=["GET"])
