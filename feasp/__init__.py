@@ -6,5 +6,4 @@ __init__ = [
     render_template,
     url_for,
     redirect,
-    session,
 ]
