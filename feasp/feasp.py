@@ -5,6 +5,7 @@ Create Time: 2023.03.27
 
 
 import os
+import json
 import threading
 
 
@@ -44,7 +45,7 @@ def url_for(endpoint, relative_path=None):
     """
 
     # 找到要url_for到的视图函数的请求路径
-    if not endpoint is None and relative_path is None:
+    if relative_path is None:
         url_func_map = _global_var["url_func_map"]
         for path, values in url_func_map.items():
             if endpoint in values:
@@ -95,6 +96,13 @@ def deal_images(image_path):
             content = fp.read()
         return content
     raise NotFoundImage(f"not found {image_path}")
+
+
+def deal_static(link_path):
+    """
+      处理css, js文件的请求
+    """
+    pass
 
 
 class Template:
@@ -227,6 +235,8 @@ class Feasp:
                 mimetype = "image/x-icon"
                 content = deal_images(path)
                 return Response(content, mimetype=mimetype)
+        # 处理css, js文件请求
+
         # 处理视图函数相关请求
         values = self.url_func_map.get(path, None)
         if values is None:
@@ -240,11 +250,8 @@ class Feasp:
         if isinstance(view_func_return, str):
             mimetype = "text/html"
         elif isinstance(view_func_return, dict):
-            temp = "{"
-            for k, v in view_func_return.items():
-                temp += f"{k}': '{v}, "
-            view_func_return = temp + "}"
-            mimetype = "text/plain"
+            view_func_return = json.dumps(view_func_return)
+            mimetype = "Application/json"
         elif isinstance(view_func_return, list) \
                 or isinstance(view_func_return, tuple):
             temp = ", ".join(view_func_return)
@@ -257,6 +264,7 @@ class Feasp:
 
     def route(self, path, methods):
         """ 将路径与视图函数进行绑定 """
+
         if methods is None:
             methods = [Method.GET]
 
