@@ -20,6 +20,11 @@ def list_():
     return ["A", "P", "k", "G"]
 
 
+@app.route("/", methods=["GET"])
+def index():
+    return render_template("index.html")
+
+
 @app.route("/image", methods=["GET"])
 def image():
     return render_template("image.html")
@@ -40,19 +45,26 @@ def set_cookies():
 
 @app.route("/show_cookies", methods=["GET"])
 def show_cookies():
-    # 通过app.cookie来拿到浏览器传递的cookie
-    if len(app.cookie) > 0:
+    # 通过app.request.cookie来拿到浏览器传递的cookie
+    if len(app.request.cookie) > 0:
         cookies = ""
-        for k, v in app.cookie.items():
+        for k, v in app.request.cookie.items():
             cookies += f"{k}={v};"
         return f"Show Cookies: {cookies}"
     return "No Cookies"
 
 
-@app.route("/", methods=["GET"])
-def index():
-    return render_template("index.html")
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if app.request.method == "POST":
+        if app.request.form["username"] == "xuefeng" \
+                and app.request.form["password"] == "123456789":
+            session["username"] = "xuefeng"
+            session["password"] = "123456789"
+            # 至此可以考虑实现@login_required装饰器了
+            return "Your login correctly !"
+    return render_template("login.html")
 
 
 if __name__ == "__main__":
-    app.run("127.0.0.1", 8000)
+    app.run("127.0.0.1", 8000, multithread=True)
