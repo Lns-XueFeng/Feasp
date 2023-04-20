@@ -9,11 +9,7 @@ import json
 import threading
 
 
-class NotFoundImage(Exception):
-    pass
-
-
-class NotFoundViewFunc(Exception):
+class NotFound(Exception):
     pass
 
 
@@ -31,7 +27,7 @@ def redirect(request_url):
     if request_url in url_func_map:
         view_func = url_func_map[request_url][1]
         return view_func()
-    raise NotFoundViewFunc("not found view function")
+    raise NotFound("not found view function")
 
 
 def url_for(endpoint, relative_path=None):
@@ -50,7 +46,7 @@ def url_for(endpoint, relative_path=None):
         for path, values in url_func_map.items():
             if endpoint in values:
                 return path
-        raise NotFoundViewFunc("not found view function")
+        raise NotFound("not found view function")
     # 以下代码需要等到支持模板渲染时才可用
     if endpoint in ("static", "templates") and relative_path is not None:
         if relative_path[0] == "/":
@@ -95,14 +91,22 @@ def deal_images(image_path):
         with open(filepath, 'rb') as fp:
             content = fp.read()
         return content
-    raise NotFoundImage(f"not found {image_path}")
+    raise NotFound(f"not found {image_path}")
 
 
 def deal_static(link_path):
     """
       处理css, js文件的请求
     """
-    pass
+    if link_path[0] == "/":
+        link_path = link_path[1:]
+
+    filepath = os.path.join(_global_var["user_pkg_abspath"], "static", link_path)
+    if os.path.exists(filepath):
+        with open(filepath, 'r') as fp:
+            content = fp.read()
+        return content
+    raise NotFound(f"not found {link_path}")
 
 
 class Template:
@@ -228,7 +232,6 @@ class Feasp:
 
     def dispatch(self, path, method):
         """ 处理请求并返回对应视图函数的响应 """
-
         # 处理图片相关请求
         for bq in (".ico", ".jpg", ".png"):
             if bq in path:
@@ -236,7 +239,15 @@ class Feasp:
                 content = deal_images(path)
                 return Response(content, mimetype=mimetype)
         # 处理css, js文件请求
-
+        for bq in (".css", ".js"):
+            if bq in path and bq == ".css":
+                mimetype = "text/css"
+                content = deal_static(path)
+                return Response(content, mimetype=mimetype)
+            if bq in path and bq == ".js":
+                mimetype = "application/javascript"
+                content = deal_static(path)
+                return Response(content, mimetype=mimetype)
         # 处理视图函数相关请求
         values = self.url_func_map.get(path, None)
         if values is None:
@@ -264,7 +275,6 @@ class Feasp:
 
     def route(self, path, methods):
         """ 将路径与视图函数进行绑定 """
-
         if methods is None:
             methods = [Method.GET]
 
