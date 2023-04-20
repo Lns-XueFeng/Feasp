@@ -279,24 +279,27 @@ class Feasp:
 
     def wsgi_apl(self, environ, start_response):
         _http_local.request = Request(environ)
-        self.cookie = _http_local.request.cookie   # 传递cookie
 
-        _http_local.response = self.dispatch(
-            _http_local.request.path, _http_local.request.method)
+        # 当并发请求时, 可能会造成cookie或session的错误竞争存取
+        # 因此使用锁将取cookie和返回响应(包括session相关操作)设置为原子性执行
+        with threading.Lock():
+            self.cookie = _http_local.request.cookie   # 传递cookie
+            _http_local.response = self.dispatch(
+                _http_local.request.path, _http_local.request.method)
         return _http_local.response(environ, start_response)
 
-    # 仅支持单线程
-    # def run(self, host, port):
-    #     from wsgiref.simple_server import make_server
-    #     with make_server(host, port, self.wsgi_apl) as httpd:
-    #         print(f"* Running on http://{host}:{port}")
-    #         httpd.serve_forever()
+    def run(self, host, port, multithread=True):
+        if multithread:   # 默认使用支持多线程的run_simple
+            from werkzeug.serving import run_simple
+            run_simple(host, port, self.wsgi_apl)
 
-    def run(self, host, port):
-        from werkzeug.serving import run_simple
-        run_simple(host, port, self.wsgi_apl)
+        if not multithread:   # 否则使用单线程的make_server
+            from wsgiref.simple_server import make_server
+            with make_server(host, port, self.wsgi_apl) as httpd:
+                print(f"* Running on http://{host}:{port}")
+                httpd.serve_forever()
 
 
 _global_var = dict()   # 存一些需要全局使用的变量
-_http_local = threading.local()   # 保证多线程请求的线程安全
+_http_local = threading.local()   # 保证多线程请求时的线程安全
 session = dict()   # session会话: 用户用于让浏览器设置cookie
