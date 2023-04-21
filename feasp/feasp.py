@@ -6,6 +6,7 @@ Create Time: 2023.03.27
 
 import os
 import json
+import re
 import threading
 from urllib.parse import parse_qs
 
@@ -58,7 +59,7 @@ def url_for(endpoint, relative_path=None):
     raise UrlForError("url_for func error")
 
 
-def render_template(filename):
+def render_template(filename, **kwargs):
     """
       渲染templates下的html文件
       因此你需要将所有html文件放在templates目录中
@@ -69,11 +70,7 @@ def render_template(filename):
 
     if filename[0] == "/":
         filename = filename[1:]
-
-    filepath = os.path.join(_global_var["user_pkg_abspath"], "templates", filename)
-    with open(filepath, 'r') as fp:
-        content = fp.read()
-    return content
+    return Template(filename).render(**kwargs)
 
 
 def deal_images(image_path):
@@ -102,6 +99,7 @@ def deal_static(link_path):
       比如example/static下的style.css
       你应该在html中这样写：/style.css 或者 style.css
     """
+
     if link_path[0] == "/":
         link_path = link_path[1:]
 
@@ -114,7 +112,34 @@ def deal_static(link_path):
 
 
 class Template:
-    pass
+
+    """ Template为渲染类, 解析html模板
+      如果用户在模板中设置了占位符, 则将其渲染替换成相应的变量
+      目前仅支持设置变量, 占位符为花括号{}, 变量定义在花括号内即可, 比如{name}
+      注意：传入的变量必须与在模板中定义的变量一致, 而后以key=value的形式传入渲染函数 """
+
+    def __init__(self, filename):
+        self.filename = filename
+
+    @staticmethod
+    def replace(match, replacements):
+        key = match.group()[1:-1]
+        return replacements.get(key, match.group())
+
+    def render(self, **kwargs):
+
+        filepath = os.path.join(
+            _global_var["user_pkg_abspath"], "templates", self.filename)
+        with open(filepath, 'r') as fp:
+            content = fp.read()
+
+        replacements = kwargs
+        render_text = re.sub(
+            r"{.*?}", lambda match: self.replace(match, replacements), content)
+        return render_text
+
+    def __repr__(self):
+        return f"<{type(self).__name__} {self.filename}>"
 
 
 class Request:
@@ -225,7 +250,8 @@ class Error:
 class Feasp:
 
     """ Feasp: 一个简易的Web框架, 基于WSGI规范, 仅用来学习交流
-      实现了路由注册, WSGI Application, 请求的分发, 各种资源的自动处理
+      实现了路由注册(支持GET、POST), WSGI Application, 请求的分发, 各种资源的自动处理
+      提供, 在视图路径中定义固定变量, 在视图函数中用session设置cookie, 使用app.request读取相关属性
       使用示例:
       from feasp import Feasp
 
@@ -243,7 +269,7 @@ class Feasp:
 
     def __init__(self, filename):
         # url与view_func的映射
-        self.__url_func_map = {}
+        self.__url_func_map = {"path_and_var": {}}
 
         # self.__url_func_map 传入全局字典
         _global_var["url_func_map"] = self.__url_func_map
@@ -273,13 +299,22 @@ class Feasp:
                 mimetype = "application/javascript"
                 content = deal_static(path)
                 return self.response_class(content, mimetype=mimetype)
+
         # 处理视图函数相关请求
         values = self.__url_func_map.get(path, None)
-        if values is None:
+        variable = None
+        if values is None:   # 判断path是否携带变量
+            for_path, variable = path.split("/")[:-1], path.split("/")[-1]
+            path = "/".join(for_path)
+            values = self.__url_func_map["path_and_var"].get(path, None)
+        if values is None:   # 如果还是None, 抛出错误
             return Error.http_404
 
         endpoint, view_func, methods = values
-        view_func_return = view_func()
+        if variable:   # 如果有variable, 则传入视图函数
+            view_func_return = view_func(variable)
+        else:
+            view_func_return = view_func()
         if method not in methods:
             return Error.http_405
 
@@ -307,8 +342,12 @@ class Feasp:
             def wrapper(*args, **kwargs):
                 return func(*args, **kwargs)
 
-            endpoint = func.__name__   # 此处端点为视图函数的名称
-            self.__url_func_map[path] = (endpoint, func, methods)
+            endpoint = func.__name__  # 此处端点为视图函数的名称
+            if "<variable:value>" in path:   # 支持url变量定义, 固定为此形式
+                new_path = "/".join(path.split("/")[:-1])
+                self.__url_func_map["path_and_var"][new_path] = (endpoint, func, methods)
+            else:
+                self.__url_func_map[path] = (endpoint, func, methods)
             return wrapper
         return decorator
 
