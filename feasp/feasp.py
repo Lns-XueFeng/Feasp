@@ -15,14 +15,11 @@ class NotFound(Exception):
     pass
 
 
-class UrlForError(Exception):
-    pass
-
-
 def redirect(request_url):
     """
       提供一个方便重定向的函数
       传入一个需要跳转的路径, 此函数生成对应的响应
+      例子见: example/app.py -> redirect_视图函数
     """
 
     url_func_map = _global_var["url_func_map"]
@@ -32,48 +29,42 @@ def redirect(request_url):
     raise NotFound("not found view function")
 
 
-def url_for(endpoint, relative_path=None):
+def url_for(endpoint):
     """
       提供一个更方便构建文件路径的函数
-      endpoint: 端点, 可以是static, templates, view_func_name
-      relative_path: 为相对应端点的相对路径
-      你应该这样传入relative_path：/index.html 或者 index.html 或者不传
-
-      目前不支持在模板中使用, 仅支持在视图函数中使用
+      仅支持在视图函数中使用, 传入需要url_for的view_func_name
+      例子见: example/app.py -> redirect_视图函数
     """
 
     # 找到要url_for到的视图函数的请求路径
-    if relative_path is None:
-        url_func_map = _global_var["url_func_map"]
-        for path, values in url_func_map.items():
-            if endpoint in values:
-                return path
-        raise NotFound("not found view function")
-    # 以下代码需要等到支持模板渲染时才可用
-    if endpoint in ("static", "templates") and relative_path is not None:
-        if relative_path[0] == "/":
-            relative_path = relative_path[1:]
-
-        abspath = os.path.join(_global_var["user_pkg_abspath"], endpoint, relative_path)
-        return abspath
-    raise UrlForError("url_for func error")
+    url_func_map = _global_var["url_func_map"]
+    for path, values in url_func_map.items():
+        if endpoint in values:
+            return path
+    raise NotFound("not found view function")
 
 
-def render_template(filename, **kwargs):
+def render_template(filename, **context):
     """
       渲染templates下的html文件
       因此你需要将所有html文件放在templates目录中
       filename为html文件在templates中的相对路径
+      **context为用户传入的上下文变量, 其为一个个键值对
       你应该这样传入filename：/index.html 或者 index.html
-      后续增加可传变量、引擎解析等
+      例子见: example/app.py -> index and show_variable视图函数
     """
 
     if filename[0] == "/":
         filename = filename[1:]
-    return Template(filename).render(**kwargs)
+
+    filepath = os.path.join(
+        _global_var["user_pkg_abspath"], "templates", filename)
+    with open(filepath, 'r', encoding="utf-8") as fp:
+        text = fp.read()
+    return Template(text, context).render()
 
 
-def deal_images(image_path):
+def _deal_images(image_path):
     """
       处理图片请求相关, 支持jpg, png, ico
       image_path: static目录下的文件路径
@@ -92,7 +83,7 @@ def deal_images(image_path):
     raise NotFound(f"not found {image_path}")
 
 
-def deal_static(link_path):
+def _deal_static(link_path):
     """
       处理css, js文件的请求
       link_path: static目录下的文件路径
@@ -105,7 +96,7 @@ def deal_static(link_path):
 
     filepath = os.path.join(_global_var["user_pkg_abspath"], "static", link_path)
     if os.path.exists(filepath):
-        with open(filepath, 'r') as fp:
+        with open(filepath, 'r', encoding="utf-8") as fp:
             content = fp.read()
         return content
     raise NotFound(f"not found {link_path}")
@@ -114,32 +105,102 @@ def deal_static(link_path):
 class Template:
 
     """ Template为渲染类, 解析html模板
-      如果用户在模板中设置了占位符, 则将其渲染替换成相应的变量
-      目前仅支持设置变量, 占位符为花括号{}, 变量定义在花括号内即可, 比如{name}
+      目前支持定义变量与循环并进行渲染:
+        定义变量: 占位符为花括号{{}}, 变量定义在花括号内即可, 比如{{name}}
+        定义循环: {% for name in name_list %}
+                    {{name}}
+                 {% endfor %}
       注意：传入的变量必须与在模板中定义的变量一致, 而后以key=value的形式传入渲染函数 """
 
-    def __init__(self, filename):
-        self.filename = filename
+    def __init__(self, text, context):
+        # text为模板的HTML代码
+        self.text = text
 
-    @staticmethod
-    def replace(match, replacements):
-        key = match.group()[1:-1]
-        return replacements.get(key, match.group())
+        # context为用户传入的上下文变量
+        self.context = context
 
-    def render(self, **kwargs):
+        # 匹配出所有的for语句, 模板变量
+        self.snippets = re.split("({{.*?}}|{%.*?%})", self.text, flags=re.DOTALL)
 
-        filepath = os.path.join(
-            _global_var["user_pkg_abspath"], "templates", self.filename)
-        with open(filepath, 'r') as fp:
-            content = fp.read()
+        # 保存从HTML中解析出来的for语句代码片段
+        self.for_snippet = []
 
-        replacements = kwargs
-        render_text = re.sub(
-            r"{.*?}", lambda match: self.replace(match, replacements), content)
-        return render_text
+        # 保存最终地渲染结果
+        self.result = []
+
+        # 处理snippets中的代码段
+        self._deal_code_segment()
+
+    def _get_var_value(self, var):
+        """ 根据变量名获取变量的值 """
+
+        if '.' not in var:
+            value = self.context.get(var)
+        else:
+            obj, attr = var.split('.')
+            value = getattr(self.context.get(obj), attr)
+
+        if not isinstance(value, str):
+            value = str(value)
+        return value
+
+    def _deal_code_segment(self):
+        """ 处理所有匹配出来的代码段 """
+        # 标记是否为for语句代码段
+        is_for_snippet = False
+
+        # 遍历所有匹配出来的代码片段
+        for snippet in self.snippets:
+            # 解析模板变量
+            if snippet.startswith("{{"):
+                if is_for_snippet is False:
+                    var = snippet[2:-2].strip()
+                    snippet = self._get_var_value(var)
+            # 解析for语句
+            elif snippet.startswith("{%"):
+                if "in" in snippet:
+                    is_for_snippet = True
+                    self.result.append("{}")
+                else:
+                    is_for_snippet = False
+                    snippet = ''
+
+            if is_for_snippet:
+                # 如果是for语句代码段, 需要进行二次处理, 暂时保存到for语句片段列表中
+                self.for_snippet.append(snippet)
+            else:
+                # 如果是模板变量, 直接将变量值追加到结果列表中
+                self.result.append(snippet)
+
+    def _parse_for_snippet(self):
+        """ 解析for语句片段代码 """
+        result = []   # 保存for语句片段解析结果
+        if self.for_snippet:
+            # 解析for语句开始代码片段
+            words = self.for_snippet[0][2:-2].strip().split()
+            iter_obj_from_context = self.context.get(words[-1])
+            for value in iter_obj_from_context:
+                # 遍历for语句片段的代码块
+                for snippet in self.for_snippet[1:]:
+                    if snippet.startswith("{{"):
+                        var = snippet[2:-2].strip()
+                        if '.' not in var:
+                            snippet = value
+                        else:
+                            obj, attr = var.split('.')
+                            snippet = getattr(value, attr)
+
+                    if not isinstance(snippet, str):
+                        snippet = str(snippet)
+                    result.append(snippet)   # 将解析出来的循环变量结果追加到for语句片段解析结果列表中
+        return result
+
+    def render(self):
+        for_result = self._parse_for_snippet()   # 获取for语句片段解析结果
+        return "".join(self.result).format(''.join(for_result))
 
     def __repr__(self):
-        return f"<{type(self).__name__} {self.filename}>"
+        return f"<{type(self).__name__} {self.context}>"
 
 
 class Request:
@@ -176,7 +237,10 @@ class Request:
     def get_form(environ):
         rb_size = int(environ.get('CONTENT_LENGTH', 0))
         rb = environ["wsgi.input"].read(rb_size)
-        return parse_qs(rb)
+        rb_form = parse_qs(rb)
+        # 需要将rb_form中bytes的key和value解码成字符串
+        sb_form = {bk.decode(): [bv[0].decode()][0] for bk, bv in rb_form.items()}
+        return sb_form
 
     def __repr__(self):
         return f"<{type(self).__name__} {self.method} {self.protocol} {self.path}>"
@@ -250,8 +314,8 @@ class Error:
 class Feasp:
 
     """ Feasp: 一个简易的Web框架, 基于WSGI规范, 仅用来学习交流
-      实现了路由注册(支持GET、POST), WSGI Application, 请求的分发, 各种资源的自动处理
-      提供, 在视图路径中定义固定变量, 在视图函数中用session设置cookie, 使用app.request读取相关属性
+      实现了路由注册(支持GET、POST), WSGI Application, 请求的分发, 支持多线程及响应安全返回
+      提供各种资源的自动处理, 在视图路径中定义固定变量, 在视图函数中用session设置cookie, 使用app.request读取相关属性
       使用示例:
       from feasp import Feasp
 
@@ -287,17 +351,17 @@ class Feasp:
         for bq in (".ico", ".jpg", ".png"):
             if bq in path:
                 mimetype = "image/x-icon"
-                content = deal_images(path)
+                content = _deal_images(path)
                 return self.response_class(content, mimetype=mimetype)
         # 处理css, js文件请求
         for bq in (".css", ".js"):
             if bq in path and bq == ".css":
                 mimetype = "text/css"
-                content = deal_static(path)
+                content = _deal_static(path)
                 return self.response_class(content, mimetype=mimetype)
             if bq in path and bq == ".js":
                 mimetype = "application/javascript"
-                content = deal_static(path)
+                content = _deal_static(path)
                 return self.response_class(content, mimetype=mimetype)
 
         # 处理视图函数相关请求
@@ -358,9 +422,11 @@ class Feasp:
         # 因此使用锁将取session和返回响应(包括session相关操作)设置为原子性执行
         # 这样就可以确保并发时每一个请求都能返回正确的request以及响应给用户
         with threading.Lock():
-            self.request = _http_local.request   # 传递request
+            self.request = _http_local.request   # 传递给进入临界区的线程其对应的request
             _http_local.response = self.dispatch(
-                _http_local.request.path, _http_local.request.method)
+                _http_local.request.path,
+                _http_local.request.method
+            )
         return _http_local.response(environ, start_response)
 
     def run(self, host, port, multithread=False):
