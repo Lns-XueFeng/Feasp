@@ -80,5 +80,11 @@ def show_variable(name):
     return render_template("variable.html", name=name, love="you")
 
 
+@app.route("/for_list", methods=["GET"])
+def for_list():
+    name_list = ["XueLian", "XueXue", "XueFeng"]
+    return render_template("for_list.html", name_list=name_list)
+
+
 if __name__ == "__main__":
     app.run("127.0.0.1", 8000, multithread=True)
