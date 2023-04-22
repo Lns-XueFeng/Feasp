@@ -107,9 +107,10 @@ class Template:
     """ Template为渲染类, 解析html模板
       目前支持定义变量与循环并进行渲染:
         定义变量: 占位符为花括号{{}}, 变量定义在花括号内即可, 比如{{name}}
-        定义循环: {% for name in name_list %}
-                    {{name}}
-                 {% endfor %}
+        定义循环(目前仅支持定义一个for循环):
+            {% for name in name_list %}
+                {{ name }}
+            {% endfor %}
       注意：传入的变量必须与在模板中定义的变量一致, 而后以key=value的形式传入渲染函数 """
 
     def __init__(self, text, context):
@@ -119,25 +120,25 @@ class Template:
         # context为用户传入的上下文变量
         self.context = context
 
-        # 匹配出所有的for语句, 模板变量
-        self.snippets = re.split("({{.*?}}|{%.*?%})", self.text, flags=re.DOTALL)
+        # 匹配出所有的模板变量, for语句
+        self.snippet_list = re.split("({{.*?}}|{%.*?%})", self.text, flags=re.DOTALL)
 
         # 保存从HTML中解析出来的for语句代码片段
         self.for_snippet = []
 
         # 保存最终地渲染结果
-        self.result = []
+        self.finally_result = []
 
         # 处理snippets中的代码段
         self._deal_code_segment()
 
-    def _get_var_value(self, var):
+    def _get_var_value(self, var_name):
         """ 根据变量名获取变量的值 """
 
-        if '.' not in var:
-            value = self.context.get(var)
-        else:
-            obj, attr = var.split('.')
+        if '.' not in var_name:
+            value = self.context.get(var_name)
+        else:   # 处理obj.attr
+            obj, attr = var_name.split('.')
             value = getattr(self.context.get(obj), attr)
 
         if not isinstance(value, str):
@@ -149,18 +150,20 @@ class Template:
         # 标记是否为for语句代码段
         is_for_snippet = False
 
-        # 遍历所有匹配出来的代码片段
-        for snippet in self.snippets:
+        for snippet in self.snippet_list:
             # 解析模板变量
             if snippet.startswith("{{"):
-                if is_for_snippet is False:
-                    var = snippet[2:-2].strip()
-                    snippet = self._get_var_value(var)
+                if not is_for_snippet:
+                    var_name = snippet[2:-2].strip()
+                    snippet = self._get_var_value(var_name)
             # 解析for语句
             elif snippet.startswith("{%"):
                 if "in" in snippet:
+                    # 注意此标记, 这意味着一旦进入for循环
+                    # 便利用此处的代码处理循环变量, 直到退出循环, 恢复标记
                     is_for_snippet = True
-                    self.result.append("{}")
+                    # 为了后续使用format方法添加解析完的for代码段, 使用{}格式符
+                    self.finally_result.append("{}")
                 else:
                     is_for_snippet = False
                     snippet = ''
@@ -170,7 +173,7 @@ class Template:
                 self.for_snippet.append(snippet)
             else:
                 # 如果是模板变量, 直接将变量值追加到结果列表中
-                self.result.append(snippet)
+                self.finally_result.append(snippet)
 
     def _parse_for_snippet(self):
         """ 解析for语句片段代码 """
@@ -178,9 +181,10 @@ class Template:
         if self.for_snippet:
             # 解析for语句开始代码片段
             words = self.for_snippet[0][2:-2].strip().split()
+            print(words)
             iter_obj_from_context = self.context.get(words[-1])
             for value in iter_obj_from_context:
-                # 遍历for语句片段的代码块
+                # 遍历for语句片段的代码块, 将value与循环体内的代码块拼接
                 for snippet in self.for_snippet[1:]:
                     if snippet.startswith("{{"):
                         var = snippet[2:-2].strip()
@@ -189,15 +193,15 @@ class Template:
                         else:
                             obj, attr = var.split('.')
                             snippet = getattr(value, attr)
-
+                    # 将解析出来的循环变量结果追加到for语句片段解析结果列表中
                     if not isinstance(snippet, str):
                         snippet = str(snippet)
-                    result.append(snippet)   # 将解析出来的循环变量结果追加到for语句片段解析结果列表中
+                    result.append(snippet)
         return result
 
     def render(self):
         for_result = self._parse_for_snippet()   # 获取for语句片段解析结果
-        return "".join(self.result).format(''.join(for_result))
+        return "".join(self.finally_result).format(''.join(for_result))
 
     def __repr__(self):
         return f"<{type(self).__name__} {self.context}>"
