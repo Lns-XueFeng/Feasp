@@ -73,10 +73,10 @@ def login():
     return render_template("login.html")
 
 
-@app.route("/variable/<variable:value>", methods=["GET"])
+@app.route("/variable/<string:name>", methods=["GET"])
 def show_variable(name):
     """ 传入的变量必须与在模板中的一致
-      且只能以key=value形式传入所需渲染的变量与值"""
+      且只能以key=value形式传入所需渲染的变量与值 """
     return render_template("variable.html", name=name, love="you")
 
 
