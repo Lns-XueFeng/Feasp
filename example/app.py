@@ -87,4 +87,4 @@ def for_list():
 
 
 if __name__ == "__main__":
-    app.run("127.0.0.1", 8000, multithread=True)
+    app.run("127.0.0.1", 8000)
