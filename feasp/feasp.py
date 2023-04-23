@@ -7,7 +7,7 @@ Why write: 通过实现一个简单的Web框架来增强自己对Web开发的了
 
 
 __author__ = "Lns-XueFeng"
-__version__ = "0.5"
+__version__ = "0.6"
 __license__ = "MIT"
 
 
