@@ -1,7 +1,14 @@
 """
 Author: Lns-XueFeng
 Create Time: 2023.03.27
+
+Why write: 通过实现一个简单的Web框架来增强自己对Web开发的了解
 """
+
+
+__author__ = "Lns-XueFeng"
+__version__ = "0.5"
+__license__ = "MIT"
 
 
 import os
@@ -9,6 +16,7 @@ import json
 import re
 import threading
 from urllib.parse import parse_qs
+from wsgiref.simple_server import make_server
 
 
 class NotFound(Exception):
@@ -252,7 +260,10 @@ class Request:
     @staticmethod
     def get_form(environ):
         """ 得到易于用户读取的form字典 """
-        rb_size = int(environ.get('CONTENT_LENGTH', 0))
+        if environ.get("CONTENT_LENGTH", "") == "":
+            rb_size = 0
+        else:
+            rb_size = int(environ.get("CONTENT_LENGTH", 0))
         rb = environ["wsgi.input"].read(rb_size)
         rb_form = parse_qs(rb)
         # 需要将rb_form中bytes的key和value解码成字符串
@@ -347,6 +358,29 @@ class Error:
     http_500.status = 500
 
 
+class FeaspServer:
+
+    """ FeaspServer, 遵守WSGI规范,
+      基于wsgiref中的make_server实现的支持多线程的server """
+
+    def __init__(self, host, port, wsgi_app, num_threads=10):
+        self.wsgi_app = wsgi_app
+        self.host = host
+        self.port = port
+        self.num_threads = num_threads
+
+    def run_server(self):
+        httpd = make_server(self.host, self.port, self.wsgi_app)
+        httpd.serve_forever()
+
+    def run(self):
+        for i in range(self.num_threads):
+            t = threading.Thread(target=self.run_server)
+            t.start()
+        print(f"Serving on http://{self.host}:{self.port}/ ...")
+        print(f"FeaspServer use {self.num_threads} threads ...")
+
+
 class Feasp:
 
     """ Feasp: 一个简易的Web框架, 基于WSGI规范, 仅用来学习交流
@@ -357,13 +391,13 @@ class Feasp:
         在视图函数中用session设置cookie, 用app.request读取相关属性
 
       使用示例:
-          from feasp import Feasp
+        from feasp import Feasp
 
-          app = Feasp(__name__)
+        app = Feasp(__name__)
 
-          @app.route('/', methods=['GET'])
-          def index():
-              return 'Hello Feasp !' """
+        @app.route('/', methods=['GET'])
+        def index():
+            return 'Hello Feasp !' """
 
     # 指向Request类
     request_class = Request
@@ -485,17 +519,10 @@ class Feasp:
             )
         return _http_local.response(environ, start_response)
 
-    def run(self, host, port, multithread=False):
-        """ Feasp启动函数, 提供两种server """
-        if not multithread:   # 默认make_server: 仅支持单线程
-            from wsgiref.simple_server import make_server
-            with make_server(host, port, self.wsgi_apl) as httpd:
-                print(f"* Running on http://{host}:{port}")
-                httpd.serve_forever()
-
-        if multithread:   # run_simple: 支持多线程
-            from werkzeug.serving import run_simple
-            run_simple(host, port, self.wsgi_apl)
+    def run(self, host, port):
+        """ 入口方法, 调用基于wsgiref实现多线程Server """
+        simple_server = FeaspServer(host, port, self.wsgi_apl)
+        simple_server.run()
 
 
 _global_var = {}   # 存一些需要全局使用的变量
