@@ -104,9 +104,9 @@ def _deal_static(link_path):
 
 class Template:
 
-    """ Template为渲染类, 解析html模板
+    """ Template为渲染类, 解析HTML模板
       目前支持定义变量与循环并进行渲染:
-        定义变量: 占位符为花括号{{}}, 变量定义在花括号内即可, 比如{{name}}
+        定义变量: 占位符为花括号{{}}, 变量定义在花括号内即可, 比如{{ name }}
         定义循环(目前仅支持定义一个for循环):
             {% for name in name_list %}
                 {{ name }}
@@ -123,7 +123,7 @@ class Template:
         # 匹配出所有的模板变量, for语句
         self.snippet_list = re.split("({{.*?}}|{%.*?%})", self.text, flags=re.DOTALL)
 
-        # 保存从HTML中解析出来的for语句代码片段
+        # 保存从HTML中解析出的for语句代码片段
         self.for_snippet = []
 
         # 保存最终地渲染结果
@@ -134,7 +134,6 @@ class Template:
 
     def _get_var_value(self, var_name):
         """ 根据变量名获取变量的值 """
-
         if '.' not in var_name:
             value = self.context.get(var_name)
         else:   # 处理obj.attr
@@ -147,8 +146,7 @@ class Template:
 
     def _deal_code_segment(self):
         """ 处理所有匹配出来的代码段 """
-        # 标记是否为for语句代码段
-        is_for_snippet = False
+        is_for_snippet = False   # 标记是否为for语句代码段
 
         for snippet in self.snippet_list:
             # 解析模板变量
@@ -181,7 +179,6 @@ class Template:
         if self.for_snippet:
             # 解析for语句开始代码片段
             words = self.for_snippet[0][2:-2].strip().split()
-            print(words)
             iter_obj_from_context = self.context.get(words[-1])
             for value in iter_obj_from_context:
                 # 遍历for语句片段的代码块, 将value与循环体内的代码块拼接
@@ -200,6 +197,7 @@ class Template:
         return result
 
     def render(self):
+        """ 组合原生html代码段与渲染完的语句代码片段 """
         for_result = self._parse_for_snippet()   # 获取for语句片段解析结果
         return "".join(self.finally_result).format(''.join(for_result))
 
@@ -210,24 +208,38 @@ class Template:
 class Request:
 
     """ Request为解析类, 解析WSGI中的HTTP参数
-      self.protocol: http协议类型
+      self.url_scheme: wsgi支持的http协议
+      self.protocol: http协议类型及版本
       self.method: http请求方法
       self.path: http请求路径(资源路径)
-      self.args: url中的参数
-      self.cookie: 存储已解析浏览器的cookie
-      self.form: 如果有POST请求则进行存储 """
+      self.url_args: url中的查询参数
+      self.request_uri: 请求uri
+      self.http_host: 请求ip与port
+      self.connection: HTTP请求是keep-alive还是close
+      self.platform: 请求来自什么系统平台
+      self.user_agent: 其中包含了请求的诸多身份信息
+      self.url: 完整的请求url, 包括了协议类型, ip:prot/域名, 资源路径
+      self.cookie: 存储已解析的来自浏览器的cookie
+      self.form: 如果有POST请求则进行表单数据存储 """
 
     def __init__(self, environ):
+        self.url_scheme = environ.get("wsgi.url_scheme")
         self.protocol = environ.get('SERVER_PROTOCOL')
         self.method = environ.get("REQUEST_METHOD")
         self.path = environ.get("PATH_INFO")
-        self.qs = environ.get("QUERY_STRING")
-        self.uri = environ.get("REQUEST_URI")
+        self.url_args = environ.get("QUERY_STRING")
+        self.request_uri = environ.get("REQUEST_URI")
+        self.http_host = environ.get("HTTP_HOST")
+        self.connection = environ.get("HTTP_CONNECTION")
+        self.platform = environ.get("HTTP_SEC_CH_UA_PLATFORM")
+        self.user_agent = environ.get("HTTP_USER_AGENT")
+        self.url = self.get_url()
         self.cookie = self.get_cookie(environ)
         self.form = self.get_form(environ)
 
     @staticmethod
     def get_cookie(environ):
+        """ 得到易于用户读取的cookie字典 """
         cookie = {}
         http_cookie = environ.get("HTTP_COOKIE")
         if http_cookie is not None:
@@ -239,12 +251,22 @@ class Request:
 
     @staticmethod
     def get_form(environ):
+        """ 得到易于用户读取的form字典 """
         rb_size = int(environ.get('CONTENT_LENGTH', 0))
         rb = environ["wsgi.input"].read(rb_size)
         rb_form = parse_qs(rb)
         # 需要将rb_form中bytes的key和value解码成字符串
         sb_form = {bk.decode(): [bv[0].decode()][0] for bk, bv in rb_form.items()}
         return sb_form
+
+    def get_url(self):
+        """ 得到易于用户使用的完整url """
+        url, header = None, None
+        if self.url_scheme:
+            header = self.url_scheme + "://"
+        if self.url_scheme and self.request_uri and self.http_host:
+            url = header + self.http_host + self.request_uri
+        return url
 
     def __repr__(self):
         return f"<{type(self).__name__} {self.method} {self.protocol} {self.path}>"
@@ -264,14 +286,22 @@ class Response:
     }
 
     def __init__(self, body, mimetype, status=200):
-        self.body = body   # 响应体
-        self.status = status   # 状态码
-        self.mimetype = mimetype   # 文本类型
-        self.headers = {   # 响应头
+        # 响应体(响应正文)
+        self.body = body
+
+        # 响应的状态码
+        self.status = status
+
+        # 响应的文本类型
+        self.mimetype = mimetype
+
+        # 响应头, 可以动态添加多个字段
+        self.headers = {
             "Content-Type": f"{self.mimetype}; charset=utf-8",
         }
 
     def __call__(self, environ, start_response):
+        """ 返回包装后的响应, 以传递给客户端 """
         global session
         if len(session) > 0:
             cookie_str = ""
@@ -280,7 +310,8 @@ class Response:
             self.headers.update(
                 {"Set-Cookie": f"{cookie_str}"}
             )
-        session.clear()   # 设置完后清空session: 之前是将session重新赋值{}, 这样并不能清空session
+        # 设置完后清空session: 之前是将session重新赋值{}, 这样并不能清空session
+        session.clear()
 
         start_response(
             f"{self.status} {self.reason_phrase[self.status]}",
@@ -292,7 +323,8 @@ class Response:
         return [self.body.encode("utf-8")]
 
     def __repr__(self):
-        return f"<{type(self).__name__} {self.mimetype} {self.status} {self.reason_phrase[self.status]}>"
+        return f"<{type(self).__name__} {self.mimetype}" \
+               f" {self.status} {self.reason_phrase[self.status]}>"
 
 
 class Method:
@@ -318,16 +350,20 @@ class Error:
 class Feasp:
 
     """ Feasp: 一个简易的Web框架, 基于WSGI规范, 仅用来学习交流
-      实现了路由注册(支持GET、POST), WSGI Application, 请求的分发, 支持多线程及响应安全返回
-      提供各种资源的自动处理, 在视图路径中定义固定变量, 在视图函数中用session设置cookie, 使用app.request读取相关属性
+      实现了路由注册(支持GET、POST), WSGI Application,
+        请求的分发, 支持多线程及响应安全返回
+
+      各种资源自动处理, 在视图路径中定义变量,
+        在视图函数中用session设置cookie, 用app.request读取相关属性
+
       使用示例:
-      from feasp import Feasp
+          from feasp import Feasp
 
-      app = Feasp(__name__)
+          app = Feasp(__name__)
 
-      @app.route('/', methods=['GET'])
-      def index():
-          return 'Hello Feasp !' """
+          @app.route('/', methods=['GET'])
+          def index():
+              return 'Hello Feasp !' """
 
     # 指向Request类
     request_class = Request
@@ -349,15 +385,15 @@ class Feasp:
         # 指向当前请求对象, 可使用户访问
         self.request = None
 
-    def dispatch(self, path, method):
-        """ 处理请求并返回对应视图函数的响应 """
-        # 处理图片相关请求
+    def _deal_static_request(self, path):
+        """ 处理图片、css、js文件相关请求 """
+
         for bq in (".ico", ".jpg", ".png"):
             if bq in path:
                 mimetype = "image/x-icon"
                 content = _deal_images(path)
                 return self.response_class(content, mimetype=mimetype)
-        # 处理css, js文件请求
+
         for bq in (".css", ".js"):
             if bq in path and bq == ".css":
                 mimetype = "text/css"
@@ -367,6 +403,23 @@ class Feasp:
                 mimetype = "application/javascript"
                 content = _deal_static(path)
                 return self.response_class(content, mimetype=mimetype)
+
+    def _deal_view_path(self, func, path, methods):
+        """ 处理视图函数中定义的路径 """
+        endpoint = func.__name__  # 此处端点为视图函数的名称
+        format_mark = re.findall("<string:.*?>", path)
+        if format_mark and format_mark[0] in path:
+            new_path = "/".join(path.split("/")[:-1])
+            self.__url_func_map["path_and_var"][new_path] = (endpoint, func, methods)
+        else:
+            self.__url_func_map[path] = (endpoint, func, methods)
+
+    def dispatch(self, path, method):
+        """ 处理请求并返回对应视图函数的响应 """
+        # 处理文件相关的请求
+        deal_return = self._deal_static_request(path)
+        if deal_return is not None:
+            return deal_return
 
         # 处理视图函数相关请求
         values = self.__url_func_map.get(path, None)
@@ -410,18 +463,17 @@ class Feasp:
             def wrapper(*args, **kwargs):
                 return func(*args, **kwargs)
 
-            endpoint = func.__name__  # 此处端点为视图函数的名称
-            if "<variable:value>" in path:   # 支持url变量定义, 固定为此形式
-                new_path = "/".join(path.split("/")[:-1])
-                self.__url_func_map["path_and_var"][new_path] = (endpoint, func, methods)
-            else:
-                self.__url_func_map[path] = (endpoint, func, methods)
+            # 处理视图函数的路径
+            self._deal_view_path(func, path, methods)
             return wrapper
         return decorator
 
     def wsgi_apl(self, environ, start_response):
-        _http_local.request = self.request_class(environ)
+        """ WSGI规定的调用Application
+          规定参数为environ, start_response
+          environ: 包含全部请求信息的字典, start_response: 可调用对象 """
 
+        _http_local.request = self.request_class(environ)
         # 当并发请求时, 可能会造成request或session的错误竞争存取
         # 因此使用锁将取session和返回响应(包括session相关操作)设置为原子性执行
         # 这样就可以确保并发时每一个请求都能返回正确的request以及响应给用户
@@ -434,6 +486,7 @@ class Feasp:
         return _http_local.response(environ, start_response)
 
     def run(self, host, port, multithread=False):
+        """ Feasp启动函数, 提供两种server """
         if not multithread:   # 默认make_server: 仅支持单线程
             from wsgiref.simple_server import make_server
             with make_server(host, port, self.wsgi_apl) as httpd:
