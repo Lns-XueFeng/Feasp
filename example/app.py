@@ -1,11 +1,13 @@
 from feasp import Feasp, Response
 from feasp import render_template, url_for, redirect, make_response
 
+
 """
 用来验证Feasp实现的功能
 一般是实现一个功能, 这里就编写一个视图函数来进行验证功能
 或者是先编写一个视图函数, 然后去框架中实现支持
 """
+
 
 app = Feasp(__name__)
 
