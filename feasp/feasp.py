@@ -5,22 +5,52 @@ Create Time: 2023.03.27
 Why write: 通过实现一个简单的Web框架来增强自己对Web开发的了解
 """
 
-
 __author__ = "Lns-XueFeng"
 __version__ = "0.6"
 __license__ = "MIT"
-
 
 import os
 import json
 import re
 import threading
-from urllib.parse import parse_qs
-from wsgiref.simple_server import make_server
 
 
 class NotFound(Exception):
     pass
+
+
+def make_response(body, mimetype="text/html", status=200):
+    """
+      提供一个可自定义响应的函数, 可自定义下列三个参数
+      body为响应体, mimetype为响应类型, status为响应状态码
+    """
+
+    if isinstance(body, str) or isinstance(body, bytes):
+        return Response(body, mimetype, status)
+    elif isinstance(body, Response):
+        body.mimetype, body.status = mimetype, status
+        return body
+    return Response(*FeaspError.http_500)
+
+
+def render_template(filename, **context):
+    """
+      渲染templates下的html文件
+      因此你需要将所有html文件放在templates目录中
+      filename为html文件在templates中的相对路径
+      **context为用户传入的上下文变量, 其为一个个键值对
+      你应该这样传入filename：/index.html 或者 index.html
+      例子见: example/app.py -> index and show_variable视图函数
+    """
+
+    if filename[0] == "/":
+        filename = filename[1:]
+
+    filepath = os.path.join(
+        _global_var["user_pkg_abspath"], "templates", filename)
+    with open(filepath, "r", encoding="utf-8") as fp:
+        text = fp.read()
+    return FeaspTemplate(text, context).render()
 
 
 def redirect(request_url):
@@ -52,26 +82,6 @@ def url_for(endpoint):
     raise NotFound("not found view function")
 
 
-def render_template(filename, **context):
-    """
-      渲染templates下的html文件
-      因此你需要将所有html文件放在templates目录中
-      filename为html文件在templates中的相对路径
-      **context为用户传入的上下文变量, 其为一个个键值对
-      你应该这样传入filename：/index.html 或者 index.html
-      例子见: example/app.py -> index and show_variable视图函数
-    """
-
-    if filename[0] == "/":
-        filename = filename[1:]
-
-    filepath = os.path.join(
-        _global_var["user_pkg_abspath"], "templates", filename)
-    with open(filepath, 'r', encoding="utf-8") as fp:
-        text = fp.read()
-    return Template(text, context).render()
-
-
 def _deal_images(image_path):
     """
       处理图片请求相关, 支持jpg, png, ico
@@ -85,7 +95,7 @@ def _deal_images(image_path):
 
     filepath = os.path.join(_global_var["user_pkg_abspath"], "static", image_path)
     if os.path.exists(filepath):
-        with open(filepath, 'rb') as fp:
+        with open(filepath, "rb") as fp:
             content = fp.read()
         return content
     raise NotFound(f"not found {image_path}")
@@ -104,14 +114,13 @@ def _deal_static(link_path):
 
     filepath = os.path.join(_global_var["user_pkg_abspath"], "static", link_path)
     if os.path.exists(filepath):
-        with open(filepath, 'r', encoding="utf-8") as fp:
+        with open(filepath, "r", encoding="utf-8") as fp:
             content = fp.read()
         return content
     raise NotFound(f"not found {link_path}")
 
 
-class Template:
-
+class FeaspTemplate:
     """ Template为渲染类, 解析HTML模板
       目前支持定义变量与循环并进行渲染:
         定义变量: 占位符为花括号{{}}, 变量定义在花括号内即可, 比如{{ name }}
@@ -142,10 +151,10 @@ class Template:
 
     def _get_var_value(self, var_name):
         """ 根据变量名获取变量的值 """
-        if '.' not in var_name:
+        if "." not in var_name:
             value = self.context.get(var_name)
-        else:   # 处理obj.attr
-            obj, attr = var_name.split('.')
+        else:  # 处理obj.attr
+            obj, attr = var_name.split(".")
             value = getattr(self.context.get(obj), attr)
 
         if not isinstance(value, str):
@@ -154,7 +163,7 @@ class Template:
 
     def _deal_code_segment(self):
         """ 处理所有匹配出来的代码段 """
-        is_for_snippet = False   # 标记是否为for语句代码段
+        is_for_snippet = False  # 标记是否为for语句代码段
 
         for snippet in self.snippet_list:
             # 解析模板变量
@@ -172,7 +181,7 @@ class Template:
                     self.finally_result.append("{}")
                 else:
                     is_for_snippet = False
-                    snippet = ''
+                    snippet = ""
 
             if is_for_snippet:
                 # 如果是for语句代码段, 需要进行二次处理, 暂时保存到for语句片段列表中
@@ -183,7 +192,7 @@ class Template:
 
     def _parse_for_snippet(self):
         """ 解析for语句片段代码 """
-        result = []   # 保存for语句片段解析结果
+        result = []  # 保存for语句片段解析结果
         if self.for_snippet:
             # 解析for语句开始代码片段
             words = self.for_snippet[0][2:-2].strip().split()
@@ -193,10 +202,10 @@ class Template:
                 for snippet in self.for_snippet[1:]:
                     if snippet.startswith("{{"):
                         var = snippet[2:-2].strip()
-                        if '.' not in var:
+                        if "." not in var:
                             snippet = value
                         else:
-                            obj, attr = var.split('.')
+                            obj, attr = var.split(".")
                             snippet = getattr(value, attr)
                     # 将解析出来的循环变量结果追加到for语句片段解析结果列表中
                     if not isinstance(snippet, str):
@@ -206,50 +215,26 @@ class Template:
 
     def render(self):
         """ 组合原生html代码段与渲染完的语句代码片段 """
-        for_result = self._parse_for_snippet()   # 获取for语句片段解析结果
-        return "".join(self.finally_result).format(''.join(for_result))
+        for_result = self._parse_for_snippet()  # 获取for语句片段解析结果
+        return "".join(self.finally_result).format("".join(for_result))
 
     def __repr__(self):
         return f"<{type(self).__name__} {self.context}>"
 
 
-class Request:
-
+class Request(threading.local):
     """ Request为解析类, 解析WSGI中的HTTP参数
-      self.url_scheme: wsgi支持的http协议
-      self.protocol: http协议类型及版本
-      self.method: http请求方法
-      self.path: http请求路径(资源路径)
-      self.url_args: url中的查询参数
-      self.request_uri: 请求uri
-      self.http_host: 请求ip与port
-      self.connection: HTTP请求是keep-alive还是close
-      self.platform: 请求来自什么系统平台
-      self.user_agent: 其中包含了请求的诸多身份信息
-      self.url: 完整的请求url, 包括了协议类型, ip:prot/域名, 资源路径
-      self.cookie: 存储已解析的来自浏览器的cookie
-      self.form: 如果有POST请求则进行表单数据存储 """
+      接收environ字典, 以解析出可供利用的字段信息 """
 
     def __init__(self, environ):
-        self.url_scheme = environ.get("wsgi.url_scheme")
-        self.protocol = environ.get('SERVER_PROTOCOL')
-        self.method = environ.get("REQUEST_METHOD")
-        self.path = environ.get("PATH_INFO")
-        self.url_args = environ.get("QUERY_STRING")
-        self.request_uri = environ.get("REQUEST_URI")
-        self.http_host = environ.get("HTTP_HOST")
-        self.connection = environ.get("HTTP_CONNECTION")
-        self.platform = environ.get("HTTP_SEC_CH_UA_PLATFORM")
-        self.user_agent = environ.get("HTTP_USER_AGENT")
-        self.url = self.get_url()
-        self.cookie = self.get_cookie(environ)
-        self.form = self.get_form(environ)
+        # HTTP请求相关信息, 字典类型
+        self.environ = environ
 
-    @staticmethod
-    def get_cookie(environ):
+    @property
+    def cookie(self):
         """ 得到易于用户读取的cookie字典 """
         cookie = {}
-        http_cookie = environ.get("HTTP_COOKIE")
+        http_cookie = self.environ.get("HTTP_COOKIE")
         if http_cookie is not None:
             cl = http_cookie.split(" ")
             for kv in cl:
@@ -257,43 +242,127 @@ class Request:
                 cookie[k] = v
         return cookie
 
-    @staticmethod
-    def get_form(environ):
+    @property
+    def form(self):
         """ 得到易于用户读取的form字典 """
-        if environ.get("CONTENT_LENGTH", "") == "":
+        from urllib.parse import parse_qs
+        if self.environ.get("CONTENT_LENGTH", "") == "":
             rb_size = 0
         else:
-            rb_size = int(environ.get("CONTENT_LENGTH", 0))
-        rb = environ["wsgi.input"].read(rb_size)
+            rb_size = int(self.environ.get("CONTENT_LENGTH", 0))
+        rb = self.environ["wsgi.input"].read(rb_size)
         rb_form = parse_qs(rb)
         # 需要将rb_form中bytes的key和value解码成字符串
         sb_form = {bk.decode(): [bv[0].decode()][0] for bk, bv in rb_form.items()}
         return sb_form
 
-    def get_url(self):
+    @property
+    def protocol(self):
+        """ HTTP协议类型及版本 """
+        return self.environ.get("SERVER_PROTOCOL")
+
+    @property
+    def method(self):
+        """ HTTP请求方法 """
+        return self.environ.get("REQUEST_METHOD")
+
+    @property
+    def url_scheme(self):
+        """ WSGI支持的http协议 """
+        return self.environ.get("wsgi.url_scheme")
+
+    @property
+    def url(self):
         """ 得到易于用户使用的完整url """
         url, header = None, None
+        request_uri = self.environ.get("REQUEST_URI")
+        http_host = self.environ.get("HTTP_HOST")
         if self.url_scheme:
             header = self.url_scheme + "://"
-        if self.url_scheme and self.request_uri and self.http_host:
-            url = header + self.http_host + self.request_uri
+        if self.url_scheme and request_uri and http_host:
+            url = header + http_host + request_uri
         return url
+
+    @property
+    def referer(self):
+        """ 当前请求来源网页 """
+        return self.environ.get("HTTP_REFERER", "")
+
+    @property
+    def path(self):
+        """ HTTP请求路径(资源路径) """
+        return self.environ.get("PATH_INFO")
+
+    @property
+    def url_args(self):
+        """ url中的查询参数 """
+        return self.environ.get("QUERY_STRING")
+
+    @property
+    def connection(self):
+        """ HTTP请求是keep-alive还是close """
+        return self.environ.get("HTTP_CONNECTION")
+
+    @property
+    def platform(self):
+        """ HTTP请求来自什么系统平台 """
+        return self.environ.get("HTTP_SEC_CH_UA_PLATFORM")
+
+    @property
+    def user_agent(self):
+        """ 其中包含了请求客户端的诸多身份信息 """
+        return self.environ.get("HTTP_USER_AGENT")
 
     def __repr__(self):
         return f"<{type(self).__name__} {self.method} {self.protocol} {self.path}>"
 
 
-class Response:
-
+class Response(threading.local):
     """ Response为响应类, 基于WSGI的包装返回
       支持bytes以及非bytes的包装返回 """
 
     reason_phrase = {
+        100: "CONTINUE",
+        101: "SWITCHING PROTOCOLS",
         200: "OK",
+        201: "CREATED",
+        202: "ACCEPTED",
+        203: "NON-AUTHORITATIVE INFORMATION",
+        204: "NO CONTENT",
+        205: "RESET CONTENT",
+        206: "PARTIAL CONTENT",
+        300: "MULTIPLE CHOICES",
+        301: "MOVED PERMANENTLY",
         302: "FOUND",
-        404: "Not Found",
-        405: "Method Not Allowed",
-        500: "Server Internal Error",
+        303: "SEE OTHER",
+        304: "NOT MODIFIED",
+        305: "USE PROXY",
+        306: "RESERVED",
+        307: "TEMPORARY REDIRECT",
+        400: "BAD REQUEST",
+        401: "UNAUTHORIZED",
+        402: "PAYMENT REQUIRED",
+        403: "FORBIDDEN",
+        404: "NOT FOUND",
+        405: "METHOD NOT ALLOWED",
+        406: "NOT ACCEPTABLE",
+        407: "PROXY AUTHENTICATION REQUIRED",
+        408: "REQUEST TIMEOUT",
+        409: "CONFLICT",
+        410: "GONE",
+        411: "LENGTH REQUIRED",
+        412: "PRECONDITION FAILED",
+        413: "REQUEST ENTITY TOO LARGE",
+        414: "REQUEST-URI TOO LONG",
+        415: "UNSUPPORTED MEDIA TYPE",
+        416: "REQUESTED RANGE NOT SATISFIABLE",
+        417: "EXPECTATION FAILED",
+        500: "INTERNAL SERVER ERROR",
+        501: "NOT IMPLEMENTED",
+        502: "BAD GATEWAY",
+        503: "SERVICE UNAVAILABLE",
+        504: "GATEWAY TIMEOUT",
+        505: "HTTP VERSION NOT SUPPORTED",
     }
 
     def __init__(self, body, mimetype, status=200):
@@ -311,18 +380,19 @@ class Response:
             "Content-Type": f"{self.mimetype}; charset=utf-8",
         }
 
+        # 供用户设置set-cookie
+        self.session = {}
+
     def __call__(self, environ, start_response):
         """ 返回包装后的响应, 以传递给客户端 """
-        global session
-        if len(session) > 0:
+
+        if len(self.session) > 0:
             cookie_str = ""
-            for k, v in session.items():
+            for k, v in self.session.items():
                 cookie_str = cookie_str + f"{k}={v} "
-            self.headers.update(
-                {"Set-Cookie": f"{cookie_str}"}
-            )
+            self.headers.update({"Set-Cookie": f"{cookie_str}"})
         # 设置完后清空session: 之前是将session重新赋值{}, 这样并不能清空session
-        session.clear()
+        self.session.clear()
 
         start_response(
             f"{self.status} {self.reason_phrase[self.status]}",
@@ -343,61 +413,107 @@ class Method:
     POST = "POST"
     DELETE = "DELETE"
     PUT = "PUT"
+    HEAD = "HEAD"
+    CONNECT = "CONNECT"
+    OPTIONS = "OPTIONS"
+    TRACE = "TRACE"
 
 
-class Error:
+class FeaspError:
+    """ FeaspError规定了所有状态码对应的响应信息 """
 
-    """ Error规定了:
-      资源未找到、方法不允许、服务器错误三种响应错误 """
-
-    http_404 = Response("<h1>Not Found 404</h1>", mimetype="text/html")
-    http_404.status = 404
-    http_405 = Response("<h1>Method Not Allowed</h1>", mimetype="text/html")
-    http_405.status = 405
-    http_500 = Response("<h1>Server Internal Error</h1>", mimetype="text/html")
-    http_500.status = 500
+    http_100 = ("<h1>CONTINUE</h1>", "text/html", 101)
+    http_101 = ("<h1>SWITCHING PROTOCOLS</h1>", "text/html", 101)
+    http_200 = ("<h1>OK</h1>", "text/html", 200)
+    http_201 = ("<h1>CREATED</h1>", "text/html", 201)
+    http_202 = ("<h1>ACCEPTED</h1>", "text/html", 202)
+    http_203 = ("<h1>NON-AUTHORITATIVE INFORMATION</h1>", "text/html", 203)
+    http_204 = ("<h1>NO CONTENT</h1>", "text/html", 204)
+    http_205 = ("<h1>RESET CONTENT</h1>", "text/html", 205)
+    http_206 = ("<h1>PARTIAL CONTENT</h1>", "text/html", 206)
+    http_300 = ("<h1>MULTIPLE CHOICES</h1>", "text/html", 300)
+    http_301 = ("<h1>MOVED PERMANENTLY</h1>", "text/html", 301)
+    http_302 = ("<h1>FOUND</h1>", "text/html", 302)
+    http_303 = ("<h1>SEE OTHER</h1>", "text/html", 303)
+    http_304 = ("<h1>NOT MODIFIED</h1>", "text/html", 304)
+    http_305 = ("<h1>USE PROXY</h1>", "text/html", 305)
+    http_306 = ("<h1>RESERVED</h1>", "text/html", 306)
+    http_307 = ("<h1>TEMPORARY REDIRECT</h1>", "text/html", 307)
+    http_400 = ("<h1>BAD REQUEST</h1>", "text/html", 400)
+    http_401 = ("<h1>UNAUTHORIZED</h1>", "text/html", 401)
+    http_402 = ("<h1>PAYMENT REQUIRED</h1>", "text/html", 402)
+    http_403 = ("<h1>FORBIDDEN</h1>", "text/html", 403)
+    http_404 = ("<h1>NOT FOUND</h1>", "text/html", 404)
+    http_405 = ("<h1>METHOD NOT ALLOWED</h1>", "text/html", 405)
+    http_406 = ("<h1>NOT ACCEPTABLE</h1>", "text/html", 406)
+    http_407 = ("<h1>PROXY AUTHENTICATION REQUIRED</h1>", "text/html", 407)
+    http_408 = ("<h1>REQUEST TIMEOUT</h1>", "text/html", 408)
+    http_409 = ("<h1>CONFLICT</h1>", "text/html", 409)
+    http_410 = ("<h1>GONE</h1>", "text/html", 410)
+    http_411 = ("<h1>LENGTH REQUIRED</h1>", "text/html", 411)
+    http_412 = ("<h1>PRECONDITION FAILED</h1>", "text/html", 412)
+    http_413 = ("<h1>REQUEST ENTITY TOO LARGE</h1>", "text/html", 413)
+    http_414 = ("<h1>REQUEST-URI TOO LONG</h1>", "text/html", 414)
+    http_415 = ("<h1>UNSUPPORTED MEDIA TYPE</h1>", "text/html", 415)
+    http_416 = ("<h1>REQUESTED RANGE NOT SATISFIABLE</h1>", "text/html", 416)
+    http_417 = ("<h1>EXPECTATION FAILED</h1>", "text/html", 417)
+    http_500 = ("<h1>INTERNAL SERVER ERROR</h1>", "text/html", 500)
+    http_501 = ("<h1>NOT IMPLEMENTED</h1>", "text/html", 501)
+    http_502 = ("<h1>BAD GATEWAY</h1>", "text/html", 502)
+    http_503 = ("<h1>SERVICE UNAVAILABLE</h1>", "text/html", 503)
+    http_504 = ("<h1>GATEWAY TIMEOUT</h1>", "text/html", 504)
+    http_505 = ("<h1>HTTP VERSION NOT SUPPORTED</h1>", "text/html", 505)
 
 
 class FeaspServer:
-
     """ FeaspServer, 遵守WSGI规范,
-      基于wsgiref中的make_server实现的支持多线程的server """
+      基于wsgiref的make_server, WSGIRequestHandler, WSGIServer实现的Server """
 
-    def __init__(self, host, port, wsgi_app, num_threads=10):
-        self.wsgi_app = wsgi_app
+    def __init__(self, host="127.0.0.1", port=8080):
         self.host = host
-        self.port = port
-        self.num_threads = num_threads
+        self.port = int(port)
 
-    def run_server(self):
-        httpd = make_server(self.host, self.port, self.wsgi_app)
-        httpd.serve_forever()
+    def run(self, app):
+        from wsgiref.simple_server import make_server
+        from wsgiref.simple_server import WSGIRequestHandler, WSGIServer
 
-    def run(self):
-        for i in range(self.num_threads):
-            t = threading.Thread(target=self.run_server)
-            t.start()
-        print(f"Serving on http://{self.host}:{self.port}/ ...")
-        print(f"FeaspServer use {self.num_threads} threads ...")
+        f_srv = make_server(self.host, self.port, app, WSGIServer,
+                            WSGIRequestHandler)
+        self.port = f_srv.server_port
+        try:
+            print(f"{self.__class__.__name__} working on {self.port}...")
+            print(f"Please click `http://{self.host}:{self.port}`...")
+            f_srv.serve_forever()
+        except KeyboardInterrupt:
+            f_srv.server_close()
+            raise
+
+    def __repr__(self):
+        return f"{type(self).__class__.__name__} {self.host}:{self.port}"
 
 
 class Feasp:
-
     """ Feasp: 一个简易的Web框架, 基于WSGI规范, 仅用来学习交流
-      实现了路由注册(支持GET、POST), WSGI Application,
-        请求的分发, 支持多线程及响应安全返回
+      实现了路由注册(支持GET、POST),
+        实现WSGI Application, 请求的分发,
 
-      各种资源自动处理, 在视图路径中定义变量,
-        在视图函数中用session设置cookie, 用app.request读取相关属性
+      内置各种资源自动处理, 支持在视图路径中定义变量,
+        在视图函数中用app.response.session设置cookie
+
+      支持返回字符串、HTML、dict以及Response作为返回值
+        可利用make_response、render_template、Response返回
+
+      提供self.request供进入上下文时读取请求信息
+        提供self.response供在返回返回值前设置Response的属性
 
       使用示例:
         from feasp import Feasp
 
         app = Feasp(__name__)
 
-        @app.route('/', methods=['GET'])
+        @app.route("/", methods=["GET"])
         def index():
-            return 'Hello Feasp !' """
+            return "Hello Feasp !" """
 
     # 指向Request类
     request_class = Request
@@ -407,7 +523,7 @@ class Feasp:
 
     def __init__(self, filename):
         # url与view_func的映射
-        self.__url_func_map = {"path_and_var": {}}
+        self.__url_func_map = {"path_have_var": {}}
 
         # self.__url_func_map 传入全局字典
         _global_var["url_func_map"] = self.__url_func_map
@@ -419,24 +535,28 @@ class Feasp:
         # 指向当前请求对象, 可使用户访问
         self.request = None
 
-    def _deal_static_request(self, path):
+        # 指向当前响应对象, 可供用户设置
+        self.response = None
+
+    @staticmethod
+    def _deal_static_request(path):
         """ 处理图片、css、js文件相关请求 """
 
         for bq in (".ico", ".jpg", ".png"):
             if bq in path:
                 mimetype = "image/x-icon"
                 content = _deal_images(path)
-                return self.response_class(content, mimetype=mimetype)
+                return content, mimetype, 200
 
         for bq in (".css", ".js"):
             if bq in path and bq == ".css":
                 mimetype = "text/css"
                 content = _deal_static(path)
-                return self.response_class(content, mimetype=mimetype)
+                return content, mimetype, 200
             if bq in path and bq == ".js":
                 mimetype = "application/javascript"
                 content = _deal_static(path)
-                return self.response_class(content, mimetype=mimetype)
+                return content, mimetype, 200
 
     def _deal_view_path(self, func, path, methods):
         """ 处理视图函数中定义的路径 """
@@ -444,7 +564,7 @@ class Feasp:
         format_mark = re.findall("<string:.*?>", path)
         if format_mark and format_mark[0] in path:
             new_path = "/".join(path.split("/")[:-1])
-            self.__url_func_map["path_and_var"][new_path] = (endpoint, func, methods)
+            self.__url_func_map["path_have_var"][new_path] = (endpoint, func, methods)
         else:
             self.__url_func_map[path] = (endpoint, func, methods)
 
@@ -458,35 +578,33 @@ class Feasp:
         # 处理视图函数相关请求
         values = self.__url_func_map.get(path, None)
         variable = None
-        if values is None:   # 判断path是否携带变量
+        if values is None:  # 判断path是否携带变量
             for_path, variable = path.split("/")[:-1], path.split("/")[-1]
             path = "/".join(for_path)
-            values = self.__url_func_map["path_and_var"].get(path, None)
-        if values is None:   # 如果还是None, 抛出错误
-            return Error.http_404
+            values = self.__url_func_map["path_have_var"].get(path, None)
+        if values is None:  # 如果还是None, 抛出错误
+            return FeaspError.http_404
 
         endpoint, view_func, methods = values
-        if variable:   # 如果有variable, 则传入视图函数
+        if variable:  # 如果有variable, 则传入视图函数
             view_func_return = view_func(variable)
         else:
             view_func_return = view_func()
         if method not in methods:
-            return Error.http_405
+            return FeaspError.http_405
 
         if isinstance(view_func_return, str):
             mimetype = "text/html"
+            return view_func_return, mimetype, 200
         elif isinstance(view_func_return, dict):
             view_func_return = json.dumps(view_func_return)
             mimetype = "Application/json"
-        elif isinstance(view_func_return, list) \
-                or isinstance(view_func_return, tuple):
-            temp = ", ".join(view_func_return)
-            view_func_return = "[" + temp + "]"
-            mimetype = "text/plain"
+            return view_func_return, mimetype, 200
+        elif isinstance(view_func_return, Response):
+            return view_func_return.body, \
+                   view_func_return.mimetype, view_func_return.status
         else:
-            return Error.http_500
-
-        return self.response_class(view_func_return, mimetype=mimetype)
+            return FeaspError.http_500
 
     def route(self, path, methods):
         """ 将路径与视图函数进行绑定 """
@@ -500,31 +618,27 @@ class Feasp:
             # 处理视图函数的路径
             self._deal_view_path(func, path, methods)
             return wrapper
+
         return decorator
 
     def wsgi_apl(self, environ, start_response):
         """ WSGI规定的调用Application
           规定参数为environ, start_response
           environ: 包含全部请求信息的字典, start_response: 可调用对象 """
-
-        _http_local.request = self.request_class(environ)
-        # 当并发请求时, 可能会造成request或session的错误竞争存取
-        # 因此使用锁将取session和返回响应(包括session相关操作)设置为原子性执行
-        # 这样就可以确保并发时每一个请求都能返回正确的request以及响应给用户
-        with threading.Lock():
-            self.request = _http_local.request   # 传递给进入临界区的线程其对应的request
-            _http_local.response = self.dispatch(
-                _http_local.request.path,
-                _http_local.request.method
-            )
-        return _http_local.response(environ, start_response)
+        self.request = self.request_class(environ)
+        self.response = self.response_class("", mimetype="text/html")
+        # 进入上下文-----------------------------------------------------------------------
+        content, mimetype, status = self.dispatch(self.request.path, self.request.method)
+        # 退出上下文-----------------------------------------------------------------------
+        self.response.body = content
+        self.response.mimetype, self.response.status = mimetype, status
+        return self.response(environ, start_response)
 
     def run(self, host, port):
         """ 入口方法, 调用基于wsgiref实现多线程Server """
-        simple_server = FeaspServer(host, port, self.wsgi_apl)
-        simple_server.run()
+        simple_server = FeaspServer(host, port)
+        simple_server.run(self.wsgi_apl)
 
 
-_global_var = {}   # 存一些需要全局使用的变量
-_http_local = threading.local()   # 保证多线程请求时的线程安全
-session = {}   # session会话: 用户用于让浏览器设置并存储cookie在本地
+_global_var = {}  # 存一些需要全局使用的变量
+_http_local = threading.local()
