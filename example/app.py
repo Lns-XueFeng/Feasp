@@ -1,5 +1,5 @@
-from feasp import Feasp
-from feasp import render_template, url_for, redirect, session
+from feasp import Feasp, Response
+from feasp import render_template, url_for, redirect, make_response
 
 """
 用来验证Feasp实现的功能
@@ -20,11 +20,6 @@ def dict_():
     return {"H": "L", "P": "D"}
 
 
-@app.route("/list", methods=["GET"])
-def list_():
-    return ["A", "P", "k", "G"]
-
-
 @app.route("/", methods=["GET"])
 def index():
     return render_template("index.html")
@@ -43,8 +38,8 @@ def redirect_():
 @app.route("/set_cookies", methods="GET")
 def set_cookies():
     # 通过session来让浏览器设置cookie
-    session["name"] = "xuefeng"
-    session["hobby"] = "code"
+    app.response.session["name"] = "xuefeng"
+    app.response.session["hobby"] = "code"
     return "Set Cookies"
 
 
@@ -62,12 +57,14 @@ def show_cookies():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if app.request.method == "POST":
-        if app.request.form["username"] == "xuefeng" \
-                and app.request.form["password"] == "123456789":
-            # session只能设置: 让浏览器设置cookie并存储
+        form = app.request.form
+        username = form["username"]   # 注意：只能用一次app.request.form
+        password = form["password"]
+        if username == "xuefeng" and password == "123456789":
+            # app.response.session只能设置: 让浏览器设置cookie并存储
             # 如果需要读取cookie, 可以这样: app.request.cookie
-            session["username"] = "xuefeng"
-            session["password"] = "123456789"
+            app.response.session["username"] = username
+            app.response.session["password"] = password
             # 至此可以考虑实现@login_required装饰器了
             return "Your login correctly !"
     return render_template("login.html")
@@ -84,6 +81,18 @@ def show_variable(name):
 def for_list():
     name_list = ["XueLian", "XueXue", "XueFeng"]
     return render_template("for_list.html", name_list=name_list)
+
+
+@app.route("/make_resp", methods=["GET"])
+def make_resp():
+    return make_response(
+        "<h1>Hello MakeResponse</h1>", mimetype="text/html", status=202)
+
+
+@app.route("/resp", methods=["GET"])
+def resp():
+    return Response(
+        "<h1>Hello Response</h1>", mimetype="text/html", status=200)
 
 
 if __name__ == "__main__":
