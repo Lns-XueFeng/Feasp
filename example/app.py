@@ -1,4 +1,4 @@
-from feasp import Feasp, Response
+from feasp import Feasp
 from feasp import render_template, url_for, redirect, make_response
 
 
@@ -39,18 +39,18 @@ def redirect_():
 
 @app.route("/set_cookies", methods="GET")
 def set_cookies():
-    # 通过session来让浏览器设置cookie
-    app.response.session["name"] = "xuefeng"
-    app.response.session["hobby"] = "code"
+    # 通过app.response.set_cookies()来让浏览器设置cookie
+    app.response.set_cookie("Name", "XueFeng")
+    app.response.set_cookie("Hobby", "Write Code")
     return "Set Cookies"
 
 
 @app.route("/show_cookies", methods=["GET"])
 def show_cookies():
     # 通过app.request.cookie来拿到浏览器传递的cookie
-    if len(app.request.cookie) > 0:
+    if len(app.request.cookies) > 0:
         cookies = ""
-        for k, v in app.request.cookie.items():
+        for k, v in app.request.cookies.items():
             cookies += f"{k}={v};"
         return f"Show Cookies: {cookies}"
     return "No Cookies"
@@ -60,13 +60,13 @@ def show_cookies():
 def login():
     if app.request.method == "POST":
         form = app.request.form
-        username = form["username"]   # 注意：只能用一次app.request.form
+        username = form["username"]
         password = form["password"]
         if username == "xuefeng" and password == "123456789":
-            # app.response.session只能设置: 让浏览器设置cookie并存储
+            # 通过app.response.set_cookies()来让浏览器设置cookie并存储
             # 如果需要读取cookie, 可以这样: app.request.cookie
-            app.response.session["username"] = username
-            app.response.session["password"] = password
+            app.response.set_cookie("username", username)
+            app.response.set_cookie("password", password)
             # 至此可以考虑实现@login_required装饰器了
             return "Your login correctly !"
     return render_template("login.html")
@@ -89,12 +89,6 @@ def for_list():
 def make_resp():
     return make_response(
         "<h1>Hello MakeResponse</h1>", mimetype="text/html", status=202)
-
-
-@app.route("/resp", methods=["GET"])
-def resp():
-    return Response(
-        "<h1>Hello Response</h1>", mimetype="text/html", status=200)
 
 
 if __name__ == "__main__":
