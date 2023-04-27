@@ -1,9 +1,9 @@
 ## Feasp
 
-一个简易的Web框架，基于WSGI规范，仅供学习交流
+A simple web framework, based on WSGI standards，only to learning and talking
 
 
-### 使用如下
+### Use examples: 
 ```python
 from feasp import Feasp
 
