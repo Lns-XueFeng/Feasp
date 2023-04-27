@@ -3,9 +3,9 @@ from feasp import render_template, url_for, redirect, make_response
 
 
 """
-用来验证Feasp实现的功能
-一般是实现一个功能, 这里就编写一个视图函数来进行验证功能
-或者是先编写一个视图函数, 然后去框架中实现支持
+Used to verify the functionality implemented by Feasp,
+Generally, to implement a function, here a view function is written to verify the function,
+Or write a view function first, and then implement support in the framework
 """
 
 
@@ -39,7 +39,7 @@ def redirect_():
 
 @app.route("/set_cookies", methods="GET")
 def set_cookies():
-    # 通过app.response.set_cookies()来让浏览器设置cookie
+    # Use app.response.set_cookies () to let the browser set cookies
     app.response.set_cookie("Name", "XueFeng")
     app.response.set_cookie("Hobby", "Write Code")
     return "Set Cookies"
@@ -47,7 +47,7 @@ def set_cookies():
 
 @app.route("/show_cookies", methods=["GET"])
 def show_cookies():
-    # 通过app.request.cookie来拿到浏览器传递的cookie
+    # Use the app.request.cookie to get the cookie passed by the browser
     if len(app.request.cookies) > 0:
         cookies = ""
         for k, v in app.request.cookies.items():
@@ -63,19 +63,19 @@ def login():
         username = form["username"]
         password = form["password"]
         if username == "xuefeng" and password == "123456789":
-            # 通过app.response.set_cookies()来让浏览器设置cookie并存储
-            # 如果需要读取cookie, 可以这样: app.request.cookie
+            # Use app.response.set_cookies () to let the browser set the cookie and store it
+            # If you need to read cookies, you can do this: app.request.cookie
             app.response.set_cookie("username", username)
             app.response.set_cookie("password", password)
-            # 至此可以考虑实现@login_required装饰器了
+            # At this point, you can consider implementing @login_required decorators
             return "Your login correctly !"
     return render_template("login.html")
 
 
 @app.route("/variable/<string:name>", methods=["GET"])
 def show_variable(name):
-    """ 传入的变量必须与在模板中的一致
-      且只能以key=value形式传入所需渲染的变量与值 """
+    """ The variables must match what define in the template,
+      and input like this: key=value, pass in the variables and values you want to render """
     return render_template("variable.html", name=name, love="you")
 
 
