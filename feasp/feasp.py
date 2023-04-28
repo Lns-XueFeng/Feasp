@@ -356,7 +356,7 @@ class FeaspTemplate:
         """ Gets the value of the variable based on the variable name """
         if "." not in var_name:
             value = self.context.get(var_name)
-        else:  # 处理obj.attr
+        else:  # Handle obj.attr
             obj, attr = var_name.split(".")
             value = getattr(self.context.get(obj), attr)
 
@@ -553,7 +553,7 @@ class Feasp:
 
         # Enter the context----------------------------------
         endpoint, view_func, methods = values
-        if variable:  # 如果有variable, 则传入视图函数
+        if variable:  # If have variable, pass in the view function
             view_func_return = view_func(variable)
         else:
             view_func_return = view_func()
