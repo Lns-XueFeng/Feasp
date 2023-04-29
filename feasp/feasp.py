@@ -13,8 +13,10 @@ import os
 import json
 import re
 import threading
+import sqlite3
+import typing as t
 from urllib.parse import parse_qs
-from typing import Optional, Union, Callable, Any
+
 
 
 METHOD: dict[str, str] = {
@@ -197,11 +199,14 @@ class Request(threading.local):
             rb_size = 0
         else:
             rb_size = int(self.environ.get("CONTENT_LENGTH", 0))
-        rb = self.environ["wsgi.input"].read(rb_size)
-        rb_form = parse_qs(rb)
-        # You need to decode the key and value of bytes in the rb_form into strings
-        sb_form = {bk.decode(): [bv[0].decode()][0] for bk, bv in rb_form.items()}
-        return sb_form
+        wsgi_input = self.environ.get("wsgi.input", "")
+        if not wsgi_input == "":
+            rb = wsgi_input.read(rb_size)
+            rb_form = parse_qs(rb)
+            # You need to decode the key and value of bytes in the rb_form into strings
+            sb_form = {bk.decode(): [bv[0].decode()][0] for bk, bv in rb_form.items()}
+            return sb_form
+        return {}
 
     def __get_cookies(self) -> dict:
         cookies = {}
@@ -274,8 +279,7 @@ class Response(threading.local):
         505: "HTTP VERSION NOT SUPPORTED",
     }
 
-    def __init__(self,
-            body: str, mimetype: str, status: int=200):
+    def __init__(self, body: str, mimetype: str, status: int=200):
         # Response body (response body)
         self.body: str = body
 
@@ -300,8 +304,7 @@ class Response(threading.local):
         new_cookie = old_cookie + add_cookie
         self.headers["Set-Cookie"] = new_cookie
 
-    def __call__(self, environ: dict,
-                 start_response: Callable) -> list[bytes]:
+    def __call__(self, environ: dict, start_response: t.Callable) -> list[bytes]:
         """ Returns the wrapped response to pass to the client """
         start_response(
             f"{self.status} {self.reason_phrase[self.status]}",
@@ -315,10 +318,6 @@ class Response(threading.local):
     def __repr__(self) -> str:
         return f"<{type(self).__name__} {self.mimetype}" \
                f" {self.status} {self.reason_phrase[self.status]}>"
-
-
-class FeaspSqlite:
-    pass
 
 
 class FeaspTemplate:
@@ -430,7 +429,7 @@ class FeaspServer:
         self.host: str = host
         self.port: int = int(port)
 
-    def run(self, app: Callable) -> None:
+    def run(self, app: t.Callable) -> None:
         from wsgiref.simple_server import make_server
         from wsgiref.simple_server import WSGIRequestHandler, WSGIServer
 
@@ -450,7 +449,8 @@ class FeaspServer:
 
 
 class Feasp:
-    """ Feasp: a simple web framework, base on WSGI standards, only for learning communication
+    """ Feasp is a simple web framework, base on WSGI standards, only for learning communication
+
       Implemented route registration (GET, POST supported),
         Implement WSGI Application, the distribution of requests,
 
@@ -473,10 +473,10 @@ class Feasp:
             return "Hello Feasp !" """
 
     # Point to the Request class
-    request_class: Any = Request
+    request_class: t.Any = Request
 
     # Point to the Response class
-    response_class: Any = Response
+    response_class: t.Any = Response
 
     def __init__(self, filename: str):
         # The mapping of URLs to view_func
@@ -490,15 +490,20 @@ class Feasp:
         _global_var["user_pkg_abspath"] = self.__user_pkg_abspath
 
         # Points to the current request object that can be accessed by the user
-        self.request: Any = None
+        self.request: t.Any = None
 
         # Points to the current response object, which is available for user settings
-        self.response: Any = None
+        self.response: t.Any = None
+
+    @property
+    def url_func_map(self):
+        """ Let user can get 'url_func_map' to see """
+        return self.__url_func_map
 
     @staticmethod
     def _deal_static_request(
             path: str
-        ) -> Optional[tuple[Union[str, bytes], str, int]]:
+        ) -> t.Optional[tuple[t.Union[str, bytes], str, int]]:
         """ Handle requests for images, css, and js files """
         for bq in (".ico", ".jpg", ".png"):
             if bq in path:
@@ -518,7 +523,7 @@ class Feasp:
         return None
 
     def _deal_view_func(self,
-            func: Callable,
+            func: t.Callable,
             path: str,
             methods: list[str]) -> None:
         """ Handles paths defined in view functions """
@@ -533,7 +538,7 @@ class Feasp:
     def dispatch(self,
             path: str,
             method: str
-        ) -> tuple[Union[str, bytes], str, int]:
+        ) -> tuple[t.Union[str, bytes], str, int]:
         """ Processes the request
           and returns a response to the corresponding view function """
         # Process file-related requests
@@ -577,7 +582,7 @@ class Feasp:
 
     def route(self,
             path: str,
-            methods: list[str]) -> Callable:
+            methods: list[str]) -> t.Callable:
         """ Bind the path to the view function """
         if methods is None:
             methods = [METHOD["GET"]]
@@ -592,17 +597,17 @@ class Feasp:
 
     def wsgi_apl(self,
             environ: dict,
-            start_response: Callable) -> list[bytes]:
+            start_response: t.Callable) -> list[bytes]:
         """ WSGI prescribes the call Application,
           The parameters defined are environ, start_response
           environ: 包含全部请求信息的字典, start_response: 可调用对象 """
         self.request = self.request_class(environ)
         self.response = self.response_class("", mimetype="text/html")
-        # *******************************************************************************
-        content, mimetype, status = self.dispatch(self.request.path, self.request.method)
-        # *******************************************************************************
-        self.response.body = content
-        self.response.mimetype, self.response.status = mimetype, status
+        # -------------------------------------------------------------------------------
+        body, mimetype, status = self.dispatch(self.request.path, self.request.method)
+        # -------------------------------------------------------------------------------
+        self.response.mimetype = mimetype
+        self.response.body, self.response.status = body, status
         return self.response(environ, start_response)
 
     def run(self, host: str, port: int) -> None:
@@ -612,7 +617,7 @@ class Feasp:
 
 
 def make_response(
-        body: Union[str, bytes],
+        body: t.Union[str, bytes],
         mimetype: str="text/html",
         status: int=200) -> Response:
     """
@@ -678,5 +683,5 @@ def url_for(endpoint: str) -> str:
     raise FeaspNotFound("not found view function")
 
 
-_global_var: dict[Any, Any] = {}  # Save some variables that need to be used globally
+_global_var: dict[t.Any, t.Any] = {}  # Save some variables that need to be used globally
 _http_local = threading.local()
