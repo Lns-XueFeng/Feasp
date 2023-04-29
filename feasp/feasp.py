@@ -600,7 +600,7 @@ class Feasp:
             start_response: t.Callable) -> list[bytes]:
         """ WSGI prescribes the call Application,
           The parameters defined are environ, start_response
-          environ: 包含全部请求信息的字典, start_response: 可调用对象 """
+          environ: includes all the requests, start_response: a callable object """
         self.request = self.request_class(environ)
         self.response = self.response_class("", mimetype="text/html")
         # -------------------------------------------------------------------------------
