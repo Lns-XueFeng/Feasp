@@ -14,7 +14,7 @@ app = Feasp(__name__)
 
 @app.route("/string", methods=["GET"])
 def string():
-    return "Hello World !"
+    return "Hello String"
 
 
 @app.route("/dict", methods=["GET"])
@@ -41,6 +41,8 @@ def redirect_():
 def set_cookies():
     # Use app.response.set_cookies () to let the browser set cookies
     app.response.set_cookie("Name", "XueFeng")
+    # response.set_cookie will ignore space
+    # So, WriteCode will be set
     app.response.set_cookie("Hobby", "Write Code")
     return "Set Cookies"
 
@@ -62,7 +64,7 @@ def login():
         form = app.request.form
         username = form["username"]
         password = form["password"]
-        if username == "xuefeng" and password == "123456789":
+        if username == "XueFeng" and password == "123456789":
             # Use app.response.set_cookies () to let the browser set the cookie and store it
             # If you need to read cookies, you can do this: app.request.cookie
             app.response.set_cookie("username", username)
