@@ -1,1 +1,1 @@
-Werkzeug==2.2.3
+requests==2.29.0
