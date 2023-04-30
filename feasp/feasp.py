@@ -13,7 +13,6 @@ import os
 import json
 import re
 import threading
-import sqlite3
 import typing as t
 from urllib.parse import parse_qs
 
@@ -279,7 +278,12 @@ class Response(threading.local):
         505: "HTTP VERSION NOT SUPPORTED",
     }
 
-    def __init__(self, body: str, mimetype: str, status: int=200):
+    def __init__(
+            self,
+            body: str=None,
+            mimetype: str=None,
+            status: int=None
+    ) -> None:
         # Response body (response body)
         self.body: str = body
 
@@ -332,7 +336,7 @@ class FeaspTemplate:
       Note: The variable passed in must match the variable defined in the template,
       and then passed in the form of key=value to the rendering function """
 
-    def __init__(self, text: str, context: dict):
+    def __init__(self, text: str, context: dict) -> None:
         # text is the HTML code for the template
         self.text: str = text
 
@@ -425,7 +429,7 @@ class FeaspServer:
     """ FeaspServer, obey the WSGI standards,
       based on the wsgiref make_server, WSGIRequestHandler, WSGIServer implemented server """
 
-    def __init__(self, host: str="127.0.0.1", port: int=8080):
+    def __init__(self, host: str="127.0.0.1", port: int=8080) -> None:
         self.host: str = host
         self.port: int = int(port)
 
@@ -478,7 +482,7 @@ class Feasp:
     # Point to the Response class
     response_class: t.Any = Response
 
-    def __init__(self, filename: str):
+    def __init__(self, filename: str) -> None:
         # The mapping of URLs to view_func
         self.__url_func_map: dict = {"path_have_var": {}}
 
@@ -503,7 +507,7 @@ class Feasp:
     @staticmethod
     def _deal_static_request(
             path: str
-        ) -> t.Optional[tuple[t.Union[str, bytes], str, int]]:
+    ) -> t.Optional[tuple[t.Union[str, bytes], str, int]]:
         """ Handle requests for images, css, and js files """
         for bq in (".ico", ".jpg", ".png"):
             if bq in path:
@@ -522,10 +526,12 @@ class Feasp:
                 return content, mimetype, 200
         return None
 
-    def _deal_view_func(self,
+    def _deal_view_func(
+            self,
             func: t.Callable,
             path: str,
-            methods: list[str]) -> None:
+            methods: list[str]
+    ) -> None:
         """ Handles paths defined in view functions """
         endpoint = func.__name__  # Here the endpoint is the name of the view function
         format_mark = re.findall("<string:.*?>", path)
@@ -535,10 +541,11 @@ class Feasp:
         else:
             self.__url_func_map[path] = (endpoint, func, methods)
 
-    def dispatch(self,
+    def dispatch(
+            self,
             path: str,
             method: str
-        ) -> tuple[t.Union[str, bytes], str, int]:
+    ) -> tuple[t.Union[str, bytes], str, int]:
         """ Processes the request
           and returns a response to the corresponding view function """
         # Process file-related requests
@@ -580,9 +587,7 @@ class Feasp:
         else:
             return FEASP_ERROR["HTTP_500"]
 
-    def route(self,
-            path: str,
-            methods: list[str]) -> t.Callable:
+    def route(self, path: str, methods: list[str]) -> t.Callable:
         """ Bind the path to the view function """
         if methods is None:
             methods = [METHOD["GET"]]
@@ -595,14 +600,16 @@ class Feasp:
             return wrapper
         return decorator
 
-    def wsgi_apl(self,
+    def wsgi_apl(
+            self,
             environ: dict,
-            start_response: t.Callable) -> list[bytes]:
+            start_response: t.Callable
+    ) -> list[bytes]:
         """ WSGI prescribes the call Application,
           The parameters defined are environ, start_response
           environ: includes all the requests, start_response: a callable object """
         self.request = self.request_class(environ)
-        self.response = self.response_class("", mimetype="text/html")
+        self.response = self.response_class()
         # -------------------------------------------------------------------------------
         body, mimetype, status = self.dispatch(self.request.path, self.request.method)
         # -------------------------------------------------------------------------------
