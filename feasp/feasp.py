@@ -5,9 +5,11 @@ Create Time: 2023.03.27
 Why write: Enhance my knowledge of web by implementing a simple web framework
 """
 
+
 __author__ = "Lns-XueFeng"
 __version__ = "0.7"
 __license__ = "MIT"
+
 
 import os
 import json
@@ -15,7 +17,6 @@ import re
 import threading
 import typing as t
 from urllib.parse import parse_qs
-
 
 
 METHOD: dict[str, str] = {
@@ -28,6 +29,7 @@ METHOD: dict[str, str] = {
     "OPTIONS": "OPTIONS",
     "TRACE": "TRACE",
 }
+
 
 FEASP_ERROR: dict[str, tuple[str, str, int]] = {
     "HTTP_100": ("<h1>CONTINUE</h1>", "text/html", 101),
@@ -223,7 +225,7 @@ class Request(threading.local):
         if self.url_scheme:
             header = self.url_scheme + "://"
         if self.url_scheme and http_host:
-            url = header + http_host + self.path
+            url = header + http_host + self.path + self.url_args
         return url
 
     def __repr__(self) -> str:
