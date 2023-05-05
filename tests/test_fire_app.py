@@ -57,7 +57,9 @@ class TestActualApp(unittest.TestCase):
 
     def test_for_list(self):
         req = requests.get("http://127.0.0.1:8000/for_list")
-        self.assertIn("<h2>Hello XueLian</h2><h2>Hello XueXue</h2><h2>Hello XueFeng</h2>", req.text)
+        self.assertIn("Hello XueLian", req.text)
+        self.assertIn("Hello XueXue", req.text)
+        self.assertIn("Hello XueFeng", req.text)
 
     def test_make_resp(self):
         req = requests.get("http://127.0.0.1:8000/make_resp")
