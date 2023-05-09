@@ -515,17 +515,17 @@ class Feasp:
             if bq in path:
                 mimetype = "image/x-icon"
                 content = _fetch_images(path)
-                return content, mimetype, 200
+                return content, 200, mimetype
 
         for bq in (".css", ".js"):
             if bq in path and bq == ".css":
                 mimetype = "text/css"
                 content = _fetch_files(path)
-                return content, mimetype, 200
+                return content, 200, mimetype
             if bq in path and bq == ".js":
                 mimetype = "application/javascript"
                 content = _fetch_files(path)
-                return content, mimetype, 200
+                return content, 200, mimetype
         return None
 
     def _deal_view_func(
@@ -578,14 +578,14 @@ class Feasp:
 
         if isinstance(view_func_return, str):
             mimetype = "text/html"
-            return view_func_return, mimetype, 200
+            return view_func_return, 200, mimetype
         elif isinstance(view_func_return, dict):
             view_func_return = json.dumps(view_func_return)
-            mimetype = "Application/json"
-            return view_func_return, mimetype, 200
+            mimetype = "application/json"
+            return view_func_return, 200, mimetype
         elif isinstance(view_func_return, Response):
             return view_func_return.body, \
-                   view_func_return.mimetype, view_func_return.status
+                   view_func_return.status, view_func_return.mimetype
         else:
             return FEASP_ERROR["HTTP_500"]
 
@@ -605,15 +605,14 @@ class Feasp:
     def wsgi_apl(
             self,
             environ: dict,
-            start_response: t.Callable
-    ) -> list[bytes]:
+            start_response: t.Callable) -> list[bytes]:
         """ WSGI prescribes the call Application,
           The parameters defined are environ, start_response
           environ: includes all the requests, start_response: a callable object """
         self.request = self.request_class(environ)
         self.response = self.response_class()
         # -------------------------------------------------------------------------------
-        body, mimetype, status = self.dispatch(self.request.path, self.request.method)
+        body, status, mimetype = self.dispatch(self.request.path, self.request.method)
         # -------------------------------------------------------------------------------
         self.response.mimetype = mimetype
         self.response.body, self.response.status = body, status
