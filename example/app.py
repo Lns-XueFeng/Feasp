@@ -112,7 +112,7 @@ def make_resp():
     # offer a tool func for you
     # and use it to return a custom response
     return make_response(
-        "<h1>Hello MakeResponse</h1>", mimetype="text/html", status=202)
+        "<h1>Hello MakeResponse</h1>", status=202, mimetype="text/html")
 
 
 if __name__ == "__main__":
