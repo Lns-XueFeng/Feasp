@@ -1,11 +1,11 @@
 ## Feasp
 
-A simple web framework, based on WSGI standards，only to learning and talking
+A simple single thread web framework, based on WSGI standards, only used to learn and talk.
 
 
 ### Use examples: 
 
-#### return a render html file
+#### return a render web page
 ```python
 from feasp import Feasp, render_template
 

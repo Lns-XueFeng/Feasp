@@ -455,7 +455,7 @@ class FeaspServer:
 
 
 class Feasp:
-    """ Feasp is a simple web framework, base on WSGI standards, only for learning communication
+    """ Feasp is a simple single thread web framework, based on WSGI standards, only used to learn and talk
 
       Implemented route registration (GET, POST supported),
         Implement WSGI Application, the distribution of requests,
