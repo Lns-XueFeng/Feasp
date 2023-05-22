@@ -121,8 +121,10 @@ def _fetch_files(link_path: str) -> str:
 
 
 class Request(threading.local):
-    """ Request is a parse class, WSGI has provided environ,
-       then we can get HTTP field from environ, finally give to the user for use """
+    """
+      Request is a parse class, WSGI has provided environ,
+      then we can get HTTP field from environ, finally give to the user for use
+    """
 
     def __init__(self, environ: dict):
         self.__environ: dict = environ
@@ -233,8 +235,10 @@ class Request(threading.local):
 
 
 class Response(threading.local):
-    """ Response is response class, it based wrapped of WSGI to return,
-      supports wrapped returns for bytes and non-bytes """
+    """
+      Response is response class, it based wrapped of WSGI to return,
+      supports wrapped returns for bytes and non-bytes
+    """
 
     reason_phrase: dict[int, str] = {
         100: "CONTINUE",
@@ -282,9 +286,9 @@ class Response(threading.local):
 
     def __init__(
             self,
-            body: str=None,
-            mimetype: str=None,
-            status: int=None
+            body: str = None,
+            mimetype: str = None,
+            status: int = None
     ) -> None:
         # Response body (response body)
         self.body: str = body
@@ -301,8 +305,10 @@ class Response(threading.local):
         }
 
     def set_cookie(self, key: str, value: str) -> None:
-        """ Set a cookie into Response and return to browser
-          and browser will store it """
+        """
+          Set a cookie into Response
+          and return to browser and browser will store it
+        """
         key = "".join(key.split(" "))
         value = "".join(value.split(" "))
         add_cookie = f"{key}={value} "
@@ -311,7 +317,9 @@ class Response(threading.local):
         self.headers["Set-Cookie"] = new_cookie
 
     def __call__(self, environ: dict, start_response: t.Callable) -> list[bytes]:
-        """ Returns the wrapped response to pass to the client """
+        """
+          Returns the wrapped response to pass to the client
+        """
         start_response(
             f"{self.status} {self.reason_phrase[self.status]}",
             [(k, v) for k, v in self.headers.items()]
@@ -327,7 +335,8 @@ class Response(threading.local):
 
 
 class FeaspTemplate:
-    """ Template is a rendering class that parses HTML templates
+    """
+      Template is a rendering class that parses HTML templates
       Currently, defining variables and loops and rendering them is supported:
         1.defining variables: placeholder is {{}},
         Variables are defined inside curly braces, such as {{ name }}
@@ -336,7 +345,8 @@ class FeaspTemplate:
                 {{ name }}
             {% endfor %}
       Note: The variable passed in must match the variable defined in the template,
-      and then passed in the form of key=value to the rendering function """
+      and then passed in the form of key=value to the rendering function
+    """
 
     def __init__(self, text: str, context: dict) -> None:
         # text is the HTML code for the template
@@ -358,7 +368,9 @@ class FeaspTemplate:
         self._deal_code_segment()
 
     def _get_var_value(self, var_name: str) -> str:
-        """ Gets the value of the variable based on the variable name """
+        """
+          Gets the value of the variable based on the variable name
+        """
         if "." not in var_name:
             value = self.context.get(var_name)
         else:  # Handle obj.attr
@@ -370,7 +382,9 @@ class FeaspTemplate:
         return value
 
     def _deal_code_segment(self) -> None:
-        """ Process all matching snippets"""
+        """
+          Process all matching snippets
+        """
         is_for_snippet = False  # Mark whether it is a for statement snippet
 
         for snippet in self.snippet_list:
@@ -397,7 +411,9 @@ class FeaspTemplate:
                 self.finally_result.append(snippet)
 
     def _parse_for_snippet(self) -> list[str]:
-        """ Parse the code of the for statement fragment """
+        """
+          Parse the code of the for statement fragment
+        """
         result = []  # Save the parse result of the for statement fragment
         if self.for_snippet:
             # Parse the for statement to start the code snippet
@@ -419,7 +435,9 @@ class FeaspTemplate:
         return result
 
     def render(self) -> str:
-        """ Combine the native HTML snippet with the rendered statement snippet """
+        """
+          Combine the native HTML snippet with the rendered statement snippet
+        """
         for_result = self._parse_for_snippet()  # Get the parse result of the for statement fragment
         return "".join(self.finally_result).format("".join(for_result))
 
@@ -428,10 +446,13 @@ class FeaspTemplate:
 
 
 class FeaspServer:
-    """ FeaspServer, obey the WSGI standards,
-      based on the wsgiref make_server, WSGIRequestHandler, WSGIServer implemented server """
+    """
+      FeaspServer, obey the WSGI standards,
+      based on the wsgiref make_server,
+      WSGIRequestHandler, WSGIServer implemented server
+    """
 
-    def __init__(self, host: str="127.0.0.1", port: int=8080) -> None:
+    def __init__(self, host: str = "127.0.0.1", port: int = 8080) -> None:
         self.host: str = host
         self.port: int = int(port)
 
@@ -455,19 +476,22 @@ class FeaspServer:
 
 
 class Feasp:
-    """ Feasp is a simple single thread web framework, based on WSGI standards, only used to learn and talk
+    """
+      Feasp is a simple single thread web framework,
+      based on WSGI standards, only used to learn and talk
 
       Implemented route registration (GET, POST supported),
-        Implement WSGI Application, the distribution of requests,
+      Implement WSGI Application, the distribution of requests
 
-      Built-in automatic processing of various resources, support for defining variables in the view path,
-        Set a cookie in the view function with app.response.session
+      Built-in automatic processing of various resources,
+      support for defining variables in the view path,
+      Set a cookie in the view function with app.response.session
 
       Support for returning strings, HTML, dict, and Response as return values
-        Can use make_response, render_template to return
+      Can use make_response, render_template to return
 
       Provide self.request to read the request information when entering the context
-        Provide self.response to set the Response property before returning the return value
+      Provide self.response to set the Response property before returning the return value
 
       Use examples:
         from feasp import Feasp
@@ -476,7 +500,8 @@ class Feasp:
 
         @app.route("/", methods=["GET"])
         def index():
-            return "Hello Feasp !" """
+            return "Hello Feasp !"
+    """
 
     # Point to the Request class
     request_class: t.Any = Request
@@ -503,14 +528,18 @@ class Feasp:
 
     @property
     def url_func_map(self):
-        """ Let user can get 'url_func_map' to see """
+        """
+          Let user can get 'url_func_map' to see
+        """
         return self.__url_func_map
 
     @staticmethod
     def _deal_static_request(
             path: str
     ) -> t.Optional[tuple[t.Union[str, bytes], str, int]]:
-        """ Handle requests for images, css, and js files """
+        """
+          Handle requests for images, css, and js files
+        """
         for bq in (".ico", ".jpg", ".png"):
             if bq in path:
                 mimetype = "image/x-icon"
@@ -534,7 +563,9 @@ class Feasp:
             path: str,
             methods: list[str]
     ) -> None:
-        """ Handles paths defined in view functions """
+        """
+          Handles paths defined in view functions
+        """
         endpoint = func.__name__  # Here the endpoint is the name of the view function
         format_mark = re.findall("<string:.*?>", path)
         if format_mark and format_mark[0] in path:
@@ -548,8 +579,10 @@ class Feasp:
             path: str,
             method: str
     ) -> tuple[t.Union[str, bytes], str, int]:
-        """ Processes the request
-          and returns a response to the corresponding view function """
+        """
+          Processes the request
+          and returns a response to the corresponding view function
+        """
         # Process file-related requests
         deal_return = self._deal_static_request(path)
         if deal_return is not None:
@@ -590,7 +623,9 @@ class Feasp:
             return FEASP_ERROR["HTTP_500"]
 
     def route(self, path: str, methods: list[str]) -> t.Callable:
-        """ Bind the path to the view function """
+        """
+          Bind the path to the view function
+        """
         if methods is None:
             methods = [METHOD["GET"]]
 
@@ -606,9 +641,11 @@ class Feasp:
             self,
             environ: dict,
             start_response: t.Callable) -> list[bytes]:
-        """ WSGI prescribes the call Application,
+        """
+          WSGI prescribes the call Application,
           The parameters defined are environ, start_response
-          environ: includes all the requests, start_response: a callable object """
+          environ: includes all the requests, start_response: a callable object
+        """
         self.request = self.request_class(environ)
         self.response = self.response_class()
         # -------------------------------------------------------------------------------
@@ -619,15 +656,18 @@ class Feasp:
         return self.response(environ, start_response)
 
     def run(self, host: str, port: int) -> None:
-        """ Entry method, which calls the server based on the wsgiref implementation """
+        """
+          Entry method,
+          which calls the server based on the wsgiref implementation
+        """
         simple_server = FeaspServer(host, port)
         simple_server.run(self.wsgi_apl)
 
 
 def make_response(
         body: t.Union[str, bytes],
-        mimetype: str="text/html",
-        status: int=200) -> Response:
+        mimetype: str = "text/html",
+        status: int = 200) -> Response:
     """
       Provides a function that customizes the response with the following three parameters,
       body: response content, mimetype: response type, status: response status code
