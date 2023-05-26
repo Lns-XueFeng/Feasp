@@ -555,7 +555,6 @@ class Feasp:
                 mimetype = "application/javascript"
                 content = _fetch_files(path)
                 return content, 200, mimetype
-        return None
 
     def _deal_view_func(
             self,
@@ -630,11 +629,8 @@ class Feasp:
             methods = [METHOD["GET"]]
 
         def decorator(func):
-            def wrapper(*args, **kwargs):
-                return func(*args, **kwargs)
-
             self._deal_view_func(func, path, methods)   # Handle the path of the view function
-            return wrapper
+            return func
         return decorator
 
     def wsgi_apl(
