@@ -5,6 +5,7 @@ import requests
 # So, you should fire the app in example firstly
 # Warning: Before you fire this test file, please fire app.py
 
+
 class TestActualApp(unittest.TestCase):
 
     def test_index(self):

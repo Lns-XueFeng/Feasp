@@ -7,6 +7,7 @@ class TestBasic(unittest.TestCase):
 
     def test_route(self):
         app = Feasp(__name__)
+
         @app.route("/hello", methods=["GET"])
         def hello():
             pass
