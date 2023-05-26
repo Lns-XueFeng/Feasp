@@ -16,7 +16,6 @@ import json
 import re
 import threading
 import typing as t
-from urllib.parse import parse_qs
 
 
 METHOD: dict[str, str] = {
@@ -205,6 +204,7 @@ class Request(threading.local):
         wsgi_input = self.environ.get("wsgi.input", "")
         if not wsgi_input == "":
             rb = wsgi_input.read(rb_size)
+            from urllib.parse import parse_qs
             rb_form = parse_qs(rb)
             # You need to decode the key and value of bytes in the rb_form into strings
             sb_form = {bk.decode(): [bv[0].decode()][0] for bk, bv in rb_form.items()}
@@ -531,7 +531,14 @@ class Feasp:
         """
           Let user can get 'url_func_map' to see
         """
-        return self.__url_func_map
+        url_and_func = {}
+        for k in self.__url_func_map:
+            if k == "path_have_var":
+                for j in self.__url_func_map[k]:
+                    url_and_func[j] = self.__url_func_map[k][j][0]
+            else:
+                url_and_func[k] = self.__url_func_map[k][0]
+        return url_and_func
 
     @staticmethod
     def _deal_static_request(
