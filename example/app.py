@@ -115,5 +115,11 @@ def make_resp():
         "<h1>Hello MakeResponse</h1>", status=202, mimetype="text/html")
 
 
+@app.route("/see_my_func", methods=["GET"])
+def see_funcs():
+    # see app.py has defined all the <url: func>
+    return app.url_func_map
+
+
 if __name__ == "__main__":
     app.run("127.0.0.1", 8000)
