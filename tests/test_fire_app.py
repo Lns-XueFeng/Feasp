@@ -25,11 +25,13 @@ class TestActualApp(unittest.TestCase):
         self.assertEqual(200, req.status_code)
 
     def test_file(self):
-        req = requests.get("http://127.0.0.1:8000/head.jpg")
+        req = requests.get("http://127.0.0.1:8000/favicon.ico")
         self.assertEqual(200, req.status_code)
-        req = requests.get("http://127.0.0.1:8000/my_js.js")
+        req = requests.get("http://127.0.0.1:8000/static/head.jpg")
         self.assertEqual(200, req.status_code)
-        req = requests.get("http://127.0.0.1:8000/style.css")
+        req = requests.get("http://127.0.0.1:8000/static/my_js.js")
+        self.assertEqual(200, req.status_code)
+        req = requests.get("http://127.0.0.1:8000/static/style.css")
         self.assertEqual(200, req.status_code)
 
     def test_redirect_(self):
