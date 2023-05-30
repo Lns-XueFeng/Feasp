@@ -84,14 +84,18 @@ def _fetch_images(image_path: str) -> bytes:
       Handling image requests, support jpg, png, ico
       image_path: The file path in the static directory
       For example: `favicon。ico` in `example/static`
-      You should write in html: /favicon.ico or favicon.ico
+      You should write in html: /static/favicon.ico or use url_for function
       :raise FeaspNotFound
     """
 
-    if image_path[0] == "/":
+    if image_path == "/favicon.ico":
         image_path = image_path[1:]
+        filepath = os.path.join(_global_var["user_pkg_abspath"], 'static', image_path)
 
-    filepath = os.path.join(_global_var["user_pkg_abspath"], "static", image_path)
+    elif image_path[0] == "/":
+        image_path = image_path[1:]
+        filepath = os.path.join(_global_var["user_pkg_abspath"], image_path)
+
     if os.path.exists(filepath):
         with open(filepath, "rb") as fp:
             content = fp.read()
@@ -104,14 +108,14 @@ def _fetch_files(link_path: str) -> str:
       Handling requests of css, js file
       link_path: The file path in static directory
       For example: `style.css` in `example/static`
-      You should write in html: /style.css or style.css
+      You should write in html: /static/style.css or use url_for function
       :raise FeaspNotFound
     """
 
     if link_path[0] == "/":
         link_path = link_path[1:]
 
-    filepath = os.path.join(_global_var["user_pkg_abspath"], "static", link_path)
+    filepath = os.path.join(_global_var["user_pkg_abspath"], link_path)
     if os.path.exists(filepath):
         with open(filepath, "r", encoding="utf-8") as fp:
             content = fp.read()
@@ -373,6 +377,8 @@ class FeaspTemplate:
         """
         if "." not in var_name:
             value = self.context.get(var_name)
+        elif "url_for" in var_name:
+            value = eval(var_name)
         else:  # Handle obj.attr
             obj, attr = var_name.split(".")
             value = getattr(self.context.get(obj), attr)
@@ -718,19 +724,26 @@ def redirect(request_url: str) -> str:
     raise FeaspNotFound("not found view function")
 
 
-def url_for(endpoint: str) -> str:
+def url_for(
+        endpoint: str,
+        filename: t.Optional[str] = None) -> str:
     """
       Provide a function that makes it easier to build file paths
-      It is only supported in view functions, passing in the view_func_name that needs to be url_for
-      see example: example/app.py -> redirect_
+      It is supported that define in view functions or template
+      Usage: see example/templates/index.html and see example/app.py/redirect_
       :raise FeaspNotFound
     """
-
-    # Find the request path to the view function to url_for
-    url_func_map = _global_var["url_func_map"]
-    for path, values in url_func_map.items():
-        if endpoint in values:
-            return path
+    if endpoint and not filename:
+        # Find the request path to the view function to url_for
+        url_func_map = _global_var["url_func_map"]
+        for path, values in url_func_map.items():
+            if endpoint in values:
+                return path
+    elif endpoint and filename:
+        # get correct request url to user
+        base_url = "http://127.0.0.1:8000/"
+        request_url = os.path.join(base_url, endpoint, filename)
+        return request_url
     raise FeaspNotFound("not found view function")
 
 
