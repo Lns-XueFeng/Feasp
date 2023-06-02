@@ -3,70 +3,65 @@ from feasp import render_template, url_for, redirect, make_response
 
 
 """
-Used to verify the functionality implemented by Feasp,
-Generally, to implement a function, here a view function is written to verify the function,
-Or write a view function first, and then implement support in the framework
+用于验证 Feasp 实现的功能，
+一般来说，要实现一个函数，这里写一个视图函数来验证函数，
+或者先写一个视图函数，然后在框架中实现支持
 """
 
 
-# offer Feasp class to build an app instance,
-# and then you can use this app to make something
-# such as app.response.set_cookie(), app.request.method/cookies, ...
-# app.response offer: status, mimetype, headers, set_cookie()
-# app.request offer: url, method, cookies, ...
+# 提供Feasp类来构建应用程序实例，
+# 然后你可以使用这个程序实例来做一些事情，
+# 例如在进入上下文时可使用app.response.set_cookie(), app.request.method/cookies,...
+# app.response提供了: status, mimetype, headers, set_cookie()
+# app.request 提供了: url, method, cookies, ...
 app = Feasp(__name__)
 
 
 @app.route("/string", methods=["GET"])
 def string():
-    # you can return a string,
-    # to verify the app can run
+    # 你可以返回一个字符串来验证应用是否可以成功运行
     return "Hello String"
 
 
 @app.route("/dict", methods=["GET"])
 def dict_():
-    # support return dict type to client,
-    # feasp will convert dict to json and satisfy HTTP protocol
+    # 支持向客户端返回字典类型，
+    # feasp会将字典转换为JSON类型并满足HTTP协议
     return {"H": "L", "P": "D"}
 
 
 @app.route("/", methods=["GET"])
 def index():
-    # offer the tool func for you,
-    # and use it to render a html file in templates
+    # 为你提供了工具函数，使用它可用渲染一个在templates目录中的HTML文件
     return render_template("index.html")
 
 
 @app.route("/image", methods=["GET"])
 def image():
-    # deal the image-file request from html,
-    # and it is built in feasp
-    # for more, css/js are same built-in Feasp,
-    # you just need to define in html
+    # feasp会自动处理你定义在HTML文件中的图片元素，
+    # 它还内置了css、js文件的自动处理，方便了你的开发，
+    # 因此你只需要在HTML文件中正确的定义静态资源的路径即可
     return render_template("image.html")
 
 
 @app.route("/redirect", methods=["GET"])
 def redirect_():
-    # offer the tool func for you
-    # and use it to redirect a new web page
+    # 为你提供了工具函数，使用它可用去重定向到一个网页页面
     return redirect(url_for("index"))
 
 
 @app.route("/set_cookies", methods="GET")
 def set_cookies():
-    # Use app.response.set_cookies () to let the browser set cookies
+    # 使用app.response.set_cookies()让浏览器设置cookie
     app.response.set_cookie("Name", "XueFeng")
-    # response.set_cookie will ignore space
-    # So, WriteCode will be set
+    # response.set_cookie会忽略空间，因此会被设置为WriteCode字符串
     app.response.set_cookie("Hobby", "Write Code")
     return "Set Cookies"
 
 
 @app.route("/show_cookies", methods=["GET"])
 def show_cookies():
-    # Use the app.request.cookie to get the cookie passed by the browser
+    # 使用app.request.cookie获取浏览器传递来的cookie
     if len(app.request.cookies) > 0:
         cookies = ""
         for k, v in app.request.cookies.items():
@@ -82,42 +77,39 @@ def login():
         username = form["username"]
         password = form["password"]
         if username == "XueFeng" and password == "123456789":
-            # Use app.response.set_cookies () to let the browser set the cookie and store it
-            # If you need to read cookies, you can do this: app.request.cookie
+            # 使用app.response.set_cookies()让浏览器设置并存储cookie
+            # 如果你需要读取cookie，你可以这样做：app.request.cookie
             app.response.set_cookie("username", username)
             app.response.set_cookie("password", password)
-            # At this point, you can consider implementing @login_required decorators
+            # 此时，可以考虑实现@login_required装饰器
             return "Your login correctly !"
     return render_template("login.html")
 
 
 @app.route("/variable/<string:name>", methods=["GET"])
 def show_variable(name):
-    # you can define a variable in route path
-    # but the variables must match what define in the template
-    # and input like this: key=value, pass in the variables and values you want to render
+    # 您可以在路由路径中定义变量，但变量必须与模板中的定义匹配
+    # 并像这样输入：key=value，传入你想要渲染的变量和值
     return render_template("variable.html", name=name, love="you")
 
 
 @app.route("/for_list", methods=["GET"])
 def for_list():
-    # you can pass in a list or iterable object
-    # to finish a repeat structure work
+    # 可以传入列表或可迭代对象，去完成重复性工作
     name_list = ["XueLian", "XueXue", "XueFeng"]
     return render_template("for_list.html", name_list=name_list)
 
 
 @app.route("/make_resp", methods=["GET"])
 def make_resp():
-    # offer a tool func for you
-    # and use it to return a custom response
+    # 为你提供了工具函数，并可使用它返回一个可自定义的响应
     return make_response(
         "<h1>Hello MakeResponse</h1>", status=202, mimetype="text/html")
 
 
 @app.route("/see_my_func", methods=["GET"])
 def see_funcs():
-    # see app.py has defined all the <url: func>
+    # 可以查看app.py定义的所有的相对路径与函数的映射 <url： func>
     return app.url_func_map
 
 

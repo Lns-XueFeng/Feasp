@@ -2,7 +2,7 @@
 Author: Lns-XueFeng
 Create Time: 2023.03.27
 
-Why write: Enhance my knowledge of web by implementing a simple web framework
+目的: 通过实现一个简单的Web框架来增强我对Web开发的理解
 """
 
 
@@ -14,7 +14,6 @@ __license__ = "MIT"
 import os
 import json
 import re
-import threading
 import typing as t
 
 
@@ -81,10 +80,10 @@ class FeaspNotFound(Exception):
 
 def _fetch_images(image_path: str) -> bytes:
     """
-      Handling image requests, support jpg, png, ico
-      image_path: The file path in the static directory
-      For example: `favicon。ico` in `example/static`
-      You should write in html: /static/favicon.ico or use url_for function
+      处理图片相关的请求，支持jpg、png、ico格式的图片
+      image_path: 相对于static目录的路径
+      例如: 在`example/static`之中的`favicon。ico`
+      你应该在html中这样写: /static/favicon.ico 或者 使用 url_for 函数
       :raise FeaspNotFound
     """
 
@@ -105,10 +104,10 @@ def _fetch_images(image_path: str) -> bytes:
 
 def _fetch_files(link_path: str) -> str:
     """
-      Handling requests of css, js file
-      link_path: The file path in static directory
-      For example: `style.css` in `example/static`
-      You should write in html: /static/style.css or use url_for function
+      处理css、js相关文件的请求
+      link_path: 相对于static目录的路径
+      例如: 在`example/static`之中的`style.css`
+      你应该在html中这样写: /static/style.css 或者 使用 url_for 函数
       :raise FeaspNotFound
     """
 
@@ -123,10 +122,10 @@ def _fetch_files(link_path: str) -> str:
     raise FeaspNotFound(f"not found {link_path}")
 
 
-class Request(threading.local):
+class Request:
     """
-      Request is a parse class, WSGI has provided environ,
-      then we can get HTTP field from environ, finally give to the user for use
+      Request类是一个解析类，解析由WSGI传来的environ字典，
+      然后我们可以从该字典中得到HTTP的字段, 以提供给用户使用
     """
 
     def __init__(self, environ: dict):
@@ -137,67 +136,67 @@ class Request(threading.local):
 
     @property
     def environ(self) -> dict:
-        """ HTTP request related information, dictionary type """
+        """ HTTP请求相关信息，字典类型 """
         return self.__environ
 
     @property
     def url(self) -> str:
-        """ Get a full URL that is easy for users to use """
+        """ 获取用户易于使用的完整网址 """
         return self.__url
 
     @property
     def form(self) -> dict:
-        """ Get a form dictionary that is easy for users to read """
+        """ 获取易于用户阅读的表单字典 """
         return self.__form
 
     @property
     def cookies(self) -> dict:
-        """ Get a cookie dictionary that is easy for users to read """
+        """ 获取易于用户阅读的cookie字典 """
         return self.__cookies
 
     @property
     def protocol(self) -> str:
-        """ HTTP protocol type and version """
+        """ HTTP协议类型和版本 """
         return self.environ.get("SERVER_PROTOCOL", "")
 
     @property
     def method(self) -> str:
-        """ HTTP request method """
+        """ HTTP请求方法 """
         return self.environ.get("REQUEST_METHOD", "GET")
 
     @property
     def url_scheme(self) -> str:
-        """ The HTTP protocol supported by WSGI """
+        """ WSGI支持的HTTP协议 """
         return self.environ.get("wsgi.url_scheme", "")
 
     @property
     def referer(self) -> str:
-        """ The current web page from where """
+        """ 当前网页的来源页面 """
         return self.environ.get("HTTP_REFERER", "")
 
     @property
     def path(self) -> str:
-        """ HTTP request path (resource path) """
+        """ HTTP请求路径（资源路径） """
         return self.environ.get("PATH_INFO", "")
 
     @property
     def url_args(self) -> str:
-        """ Query parameters in url """
+        """ 网址中的查询参数 """
         return self.environ.get("QUERY_STRING", "")
 
     @property
     def connection(self) -> str:
-        """ HTTP connection status """
+        """ HTTP 连接状态码 """
         return self.environ.get("HTTP_CONNECTION", "")
 
     @property
     def platform(self) -> str:
-        """ What system platform the HTTP request came from """
+        """ HTTP请求来自哪个系统平台 """
         return self.environ.get("HTTP_SEC_CH_UA_PLATFORM", "")
 
     @property
     def user_agent(self) -> str:
-        """ It contains a lot of identity information for the requesting client """
+        """ 它包含请求客户端的大量身份相关的信息 """
         return self.environ.get("HTTP_USER_AGENT", "")
 
     def __get_form(self) -> dict:
@@ -210,7 +209,7 @@ class Request(threading.local):
             rb = wsgi_input.read(rb_size)
             from urllib.parse import parse_qs
             rb_form = parse_qs(rb)
-            # You need to decode the key and value of bytes in the rb_form into strings
+            # 将rb_form中字节的键和值解码为字符串
             sb_form = {bk.decode(): [bv[0].decode()][0] for bk, bv in rb_form.items()}
             return sb_form
         return {}
@@ -238,10 +237,10 @@ class Request(threading.local):
         return f"<{type(self).__name__} {self.method} {self.protocol} {self.path}>"
 
 
-class Response(threading.local):
+class Response:
     """
-      Response is response class, it based wrapped of WSGI to return,
-      supports wrapped returns for bytes and non-bytes
+      Response是响应类，它是基于WSGI将返回数据包装为符合规范的响应，
+      支持字节和非字节的数据进行包装并返回
     """
 
     reason_phrase: dict[int, str] = {
@@ -294,24 +293,24 @@ class Response(threading.local):
             mimetype: str = None,
             status: int = None
     ) -> None:
-        # Response body (response body)
+        # 响应正文
         self.body: str = body
 
-        # The status code of the response
+        # 响应的状态代码
         self.status: int = status
 
-        # Set the type of the response
+        # 设置响应的类型
         self.mimetype: str = mimetype
 
-        # Response headers, multiple fields can be added dynamically
+        # 响应头，可动态添加多个字段
         self.headers: dict[str, str] = {
             "Content-Type": f"{self.mimetype}; charset=utf-8",
         }
 
     def set_cookie(self, key: str, value: str) -> None:
         """
-          Set a cookie into Response
-          and return to browser and browser will store it
+          添加一个cookie字段进响应，
+          并且返回给客户端浏览器，客户端将会存储它
         """
         key = "".join(key.split(" "))
         value = "".join(value.split(" "))
@@ -322,7 +321,7 @@ class Response(threading.local):
 
     def __call__(self, environ: dict, start_response: t.Callable) -> list[bytes]:
         """
-          Returns the wrapped response to pass to the client
+          返回要传递给客户端的包装响应
         """
         start_response(
             f"{self.status} {self.reason_phrase[self.status]}",
@@ -340,46 +339,46 @@ class Response(threading.local):
 
 class FeaspTemplate:
     """
-      Template is a rendering class that parses HTML templates
-      Currently, defining variables and loops and rendering them is supported:
-        1.defining variables: placeholder is {{}},
-        Variables are defined inside curly braces, such as {{ name }}
-        2.Define the loop(Currently, only one for loop can be defined):
+      Template是一个渲染类，用于解析HTML并重新拼接的模板，
+      当前，支持定义变量、定义url_for函数、单层for循环：
+        1.定义变量的占位符为: {{}},
+        变量在花括号内定义，例如 {{ name }}
+        2.定义url_for函数: {{ url_for('static', filename='head.jpg') }}
+        3.定义循环（目前仅能定义单层for循环）:
             {% for name in name_list %}
                 {{ name }}
             {% endfor %}
-      Note: The variable passed in must match the variable defined in the template,
-      and then passed in the form of key=value to the rendering function
+      注意：传入的变量必须与模板中定义的变量匹配，并且以key=value的形式传递给渲染函数
     """
 
     def __init__(self, text: str, context: dict) -> None:
-        # text is the HTML code for the template
+        # self.text指向内存中的HTML字符串
         self.text: str = text
 
-        # context is the context variable passed in by the user
+        # self.context指向内存中用户传入的上下文变量
         self.context: dict = context
 
-        # Matches all template variables, for statements
+        # 保存从self.text中匹配的所有的模板变量、语句
         self.snippet_list: list[str] = re.split("({{.*?}}|{%.*?%})", self.text, flags=re.DOTALL)
 
-        # Save the for statement snippet parsed from the HTML
+        # 保存从HTML解析的for语句代码段
         self.for_snippet: list[str] = []
 
-        # Save the final rendered result
+        # 保存最终渲染拼接完的HTML字符串
         self.finally_result: list[str] = []
 
-        # Handle snippets in self.snippet_list
+        # 处理self.snippet_list中的代码段
         self._deal_code_segment()
 
     def _get_var_value(self, var_name: str) -> str:
         """
-          Gets the value of the variable based on the variable name
+          根据变量名称获取变量的值
         """
         if "." not in var_name:
             value = self.context.get(var_name)
-        elif "url_for" in var_name:
+        elif "url_for" in var_name:   # 支持在template中定义url_for函数
             value = eval(var_name)
-        else:  # Handle obj.attr
+        else:  # 处理obj.attr
             obj, attr = var_name.split(".")
             value = getattr(self.context.get(obj), attr)
 
@@ -389,17 +388,17 @@ class FeaspTemplate:
 
     def _deal_code_segment(self) -> None:
         """
-          Process all matching snippets
+          处理所有匹配的代码段
         """
-        is_for_snippet = False  # Mark whether it is a for statement snippet
+        is_for_snippet = False  # 标记它是否为for语句代码段
 
         for snippet in self.snippet_list:
-            # Parse template variables
+            # 解析模板变量
             if snippet.startswith("{{"):
                 if not is_for_snippet:
                     var_name = snippet[2:-2].strip()
                     snippet = self._get_var_value(var_name)
-            # Parse template statement
+            # 解析模板语句
             elif snippet.startswith("{%"):
                 if "in" in snippet:
                     is_for_snippet = True
@@ -409,20 +408,19 @@ class FeaspTemplate:
                     snippet = ""
 
             if is_for_snippet:
-                # If it is a for statement snippet,
-                # it needs to be processed twice and temporarily saved to the for statement fragment list
+                # 如果是for语句代码段，它需要处理两次并临时保存到for语句片段列表中
                 self.for_snippet.append(snippet)
             else:
-                # If is the template variables, append the variable values directly to the result list
+                # 如果是模板变量，则将变量值直接附加到结果列表
                 self.finally_result.append(snippet)
 
     def _parse_for_snippet(self) -> list[str]:
         """
-          Parse the code of the for statement fragment
+          解析for语句片段的代码
         """
-        result = []  # Save the parse result of the for statement fragment
+        result = []  # 保存for语句片段的解析结果
         if self.for_snippet:
-            # Parse the for statement to start the code snippet
+            # 解析for语句以启动代码片段
             words = self.for_snippet[0][2:-2].strip().split()
             iter_obj_from_context = self.context.get(words[-1])
             for value in iter_obj_from_context:
@@ -434,7 +432,6 @@ class FeaspTemplate:
                         else:
                             obj, attr = var.split(".")
                             snippet = getattr(value, attr)
-
                     if not isinstance(snippet, str):
                         snippet = str(snippet)
                     result.append(snippet)
@@ -442,9 +439,12 @@ class FeaspTemplate:
 
     def render(self) -> str:
         """
-          Combine the native HTML snippet with the rendered statement snippet
+          将self.finally_result与for_result合并，
+          self.finally_result为还未结合类似于for语句这样的执行结果的字符串列表，
+          for_result为已经解析并得到了for循环结果的字符串列表
         """
-        for_result = self._parse_for_snippet()  # Get the parse result of the for statement fragment
+        # 获取 for 语句片段的解析结果
+        for_result = self._parse_for_snippet()
         return "".join(self.finally_result).format("".join(for_result))
 
     def __repr__(self) -> str:
@@ -453,9 +453,8 @@ class FeaspTemplate:
 
 class FeaspServer:
     """
-      FeaspServer, obey the WSGI standards,
-      based on the wsgiref make_server,
-      WSGIRequestHandler, WSGIServer implemented server
+      FeaspServer类，遵守WSGI规范，利用以下组件实现的服务器程序，
+      wsgiref，make_server, WSGIRequestHandler, WSGIServer implemented server
     """
 
     def __init__(self, host: str = "127.0.0.1", port: int = 8080) -> None:
@@ -483,23 +482,20 @@ class FeaspServer:
 
 class Feasp:
     """
-      Feasp is a simple single thread web framework,
-      based on WSGI standards, only used to learn and talk
+      Feasp是一个简单的单线程的Web框架，基于WSGI标准，仅用于学习与交流，
 
-      Implemented route registration (GET, POST supported),
-      Implement WSGI Application, the distribution of requests
+      实现了路由注册（支持GET，POST），WSGI应用程序，请求的分发等，
 
-      Built-in automatic processing of various resources,
-      support for defining variables in the view path,
-      Set a cookie in the view function with app.response.session
+      内置各种资源自动处理，支持在视图路径中定义变量，
+      使用app.response.session可在视图函数中设置cookie，
 
-      Support for returning strings, HTML, dict, and Response as return values
-      Can use make_response, render_template to return
+      支持返回字符串、HTML、字典和响应作为返回值，
+      亦可使用make_response，render_template函数返回，
 
-      Provide self.request to read the request information when entering the context
-      Provide self.response to set the Response property before returning the return value
+      提供self.request以在进入上下文时可以读取请求信息，
+      提供self.response以在返回返回值之前可以对Response进行设置
 
-      Use examples:
+      简单的使用代码示例:
         from feasp import Feasp
 
         app = Feasp(__name__)
@@ -509,33 +505,33 @@ class Feasp:
             return "Hello Feasp !"
     """
 
-    # Point to the Request class
+    # 指向请求类
     request_class: t.Any = Request
 
-    # Point to the Response class
+    # 指向响应类
     response_class: t.Any = Response
 
     def __init__(self, filename: str) -> None:
-        # The mapping of URLs to view_func
+        # 保存URL与view_func的映射
         self.__url_func_map: dict = {"path_have_var": {}}
 
-        # self.__url_func_map: Pass in the global dictionary
+        # self.__url_func_map：传入全局字典
         _global_var["url_func_map"] = self.__url_func_map
 
-        # The path to the user's package file
+        # 获取用户程序包的绝对路径，以便于后续构建路径等
         self.__user_pkg_abspath: str = os.path.abspath(os.path.dirname(filename))
         _global_var["user_pkg_abspath"] = self.__user_pkg_abspath
 
-        # Points to the current request object that can be accessed by the user
+        # 指向用户可以访问的当前请求对象，在进入上下文时可用
         self.request: t.Any = None
 
-        # Points to the current response object, which is available for user settings
+        # 指向当前响应对象，该对象可用于用户设置，在进入上下文时可用
         self.response: t.Any = None
 
     @property
     def url_func_map(self):
         """
-          Let user can get 'url_func_map' to see
+          让用户可以查看相对路径与视图函数的映射
         """
         url_and_func = {}
         for k in self.__url_func_map:
@@ -551,7 +547,7 @@ class Feasp:
             path: str
     ) -> t.Optional[tuple[t.Union[str, bytes], str, int]]:
         """
-          Handle requests for images, css, and js files
+          处理对图像、CSS和js文件的请求
         """
         for bq in (".ico", ".jpg", ".png"):
             if bq in path:
@@ -576,9 +572,9 @@ class Feasp:
             methods: list[str]
     ) -> None:
         """
-          Handles paths defined in view functions
+          处理视图函数中定义的路径
         """
-        endpoint = func.__name__  # Here the endpoint is the name of the view function
+        endpoint = func.__name__  # 这里的端点是视图函数的名称
         format_mark = re.findall("<string:.*?>", path)
         if format_mark and format_mark[0] in path:
             new_path = "/".join(path.split("/")[:-1])
@@ -592,31 +588,30 @@ class Feasp:
             method: str
     ) -> tuple[t.Union[str, bytes], str, int]:
         """
-          Processes the request
-          and returns a response to the corresponding view function
+          处理传来的请求并返回对相应视图函数的响应
         """
-        # Process file-related requests
+        # 处理与文件相关的请求
         deal_return = self._deal_static_request(path)
         if deal_return is not None:
             return deal_return
 
-        # Handles requests related to view functions
+        # 处理与视图函数相关的请求
         values = self.__url_func_map.get(path, None)
         variable = None
-        if values is None:  # Determine whether path carries variables
+        if values is None:  # 确定路径是否携带变量
             for_path, variable = path.split("/")[:-1], path.split("/")[-1]
             path = "/".join(for_path)
             values = self.__url_func_map["path_have_var"].get(path, None)
-        if values is None:  # If it is still None, throw an error
+        if values is None:  # 如果仍为“无”，则引发错误
             return FEASP_ERROR["HTTP_404"]
 
-        # Enter the context----------------------------------
+        # 进入用户上下文----------------------------------
         endpoint, view_func, methods = values
-        if variable:  # If have variable, pass in the view function
+        if variable:  # 如果有变量，则传入视图函数
             view_func_return = view_func(variable)
         else:
             view_func_return = view_func()
-        # Exit the context-----------------------------------
+        # 退出用户上下文-----------------------------------
 
         if method not in methods:
             return FEASP_ERROR["HTTP_405"]
@@ -636,13 +631,13 @@ class Feasp:
 
     def route(self, path: str, methods: list[str]) -> t.Callable:
         """
-          Bind the path to the view function
+          将用户定义的相对路径与视图函数进行绑定
         """
         if methods is None:
             methods = [METHOD["GET"]]
 
         def decorator(func):
-            self._deal_view_func(func, path, methods)   # Handle the path of the view function
+            self._deal_view_func(func, path, methods)   # 处理视图函数的路径
             return func
         return decorator
 
@@ -651,9 +646,9 @@ class Feasp:
             environ: dict,
             start_response: t.Callable) -> list[bytes]:
         """
-          WSGI prescribes the call Application,
-          The parameters defined are environ, start_response
-          environ: includes all the requests, start_response: a callable object
+          符合WSGI规定的可调用的应用程序，
+          定义的参数为environ、start_response，
+          environ：包括所有请求，start_response：可调用对象
         """
         self.request = self.request_class(environ)
         self.response = self.response_class()
@@ -666,8 +661,7 @@ class Feasp:
 
     def run(self, host: str, port: int) -> None:
         """
-          Entry method,
-          which calls the server based on the wsgiref implementation
+          入口方法，可运行起基于WSGI实现的Feasp Server
         """
         simple_server = FeaspServer(host, port)
         simple_server.run(self.wsgi_apl)
@@ -678,8 +672,8 @@ def make_response(
         mimetype: str = "text/html",
         status: int = 200) -> Response:
     """
-      Provides a function that customizes the response with the following three parameters,
-      body: response content, mimetype: response type, status: response status code
+      提供一个函数，该函数使用以下三个参数自定义响应，
+      body: 响应正文, mimetype: 响应类型, status: 响应状态码
     """
 
     if isinstance(body, str) or isinstance(body, bytes):
@@ -691,12 +685,12 @@ def render_template(
         filename: str,
         **context: dict) -> str:
     """
-      Render the HTML file under templates,
-      So you need to put all the html files in the templates directory
-      filename is a html filename and is relation path under the templates
-      **context are context variable from user, it contains the key-value structure
-      You should write it like here, filename: /index.html or index.html
-      see example: example/app.py -> index and show_variable
+      渲染在templates目录下的HTML文件，
+      因此你需要将所有HTML文件放置在templates目录里面，
+      filename是HTML文件名，是templates下的相对路径，
+      **context是来自用户传入的上下文变量，它包含键值结构，
+      你应该像这样写filename: /index.html or index.html
+      具体使用见example目录: example/app.py -> index and show_variable
     """
 
     if filename[0] == "/":
@@ -711,9 +705,9 @@ def render_template(
 
 def redirect(request_url: str) -> str:
     """
-      Provides a function that facilitates redirection
-      Pass in a path that needs to be jumped, and this function generates a corresponding response
-      see example: example/app.py -> redirect_
+      提供一个便于重定向的函数，
+      传入需要跳转的路径，此函数生成相应的响应，
+      具体使用见example目录: example/app.py -> redirect_
       :raise FeaspNotFound
     """
 
@@ -728,24 +722,20 @@ def url_for(
         endpoint: str,
         filename: t.Optional[str] = None) -> str:
     """
-      Provide a function that makes it easier to build file paths
-      It is supported that define in view functions or template
-      Usage: see example/templates/index.html and see example/app.py/redirect_
+      提供一哥使构建路径更容易的函数，支持在视图或模板中定义，
+      具体使用见example目录: example/templates/index.html和example/app.py/redirect_
       :raise FeaspNotFound
     """
     if endpoint and not filename:
-        # Find the request path to the view function to url_for
         url_func_map = _global_var["url_func_map"]
         for path, values in url_func_map.items():
             if endpoint in values:
                 return path
     elif endpoint and filename:
-        # get correct request url to user
-        base_url = "http://127.0.0.1:8000/"
+        base_url = "http://127.0.0.1:8000/"   # 暂时硬编码
         request_url = os.path.join(base_url, endpoint, filename)
         return request_url
     raise FeaspNotFound("not found view function")
 
 
-_global_var: dict[t.Any, t.Any] = {}  # Save some variables that need to be used globally
-_http_local = threading.local()
+_global_var: dict[t.Any, t.Any] = {}  # 保存一些需要全局使用的变量
