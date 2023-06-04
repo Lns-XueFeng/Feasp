@@ -97,7 +97,7 @@ def show_variable(name):
 def for_list():
     # 可以传入列表或可迭代对象，去完成重复性工作
     name_list = ["XueLian", "XueXue", "XueFeng"]
-    return render_template("for_list.html", name_list=name_list)
+    return render_template("For_list.html", name_list=name_list)
 
 
 @app.route("/make_resp", methods=["GET"])
@@ -111,6 +111,18 @@ def make_resp():
 def see_funcs():
     # 可以查看app.py定义的所有的相对路径与函数的映射 <url： func>
     return app.url_func_map
+
+
+@app.route("/if_control", methods=["GET"])
+def if_control():
+    name = "Lns-XueFeng"
+    return render_template("If_control.html", name=name)
+
+
+@app.route("/if_and_for", methods=["GET"])
+def if_and_for():
+    name_list = ["XueLian", "XueXue", "XueFeng"]
+    return render_template("If_For.html", name_list=name_list)
 
 
 if __name__ == "__main__":
