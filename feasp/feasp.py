@@ -344,10 +344,17 @@ class FeaspTemplate:
         1.定义变量的占位符为: {{}},
         变量在花括号内定义，例如 {{ name }}
         2.定义url_for函数: {{ url_for('static', filename='head.jpg') }}
-        3.定义循环（目前仅能定义单层for循环）:
-            {% for name in name_list %}
+        3.定义判断语句（目前仅能定义单个If判断）:
+            {% If name_list: %}
+                {{ name_list[0] }}
+            {% Endif %}
+        4.定义循环（目前仅能定义单个且单层for循环）:
+            {% For name in name_list %}
                 {{ name }}
-            {% endfor %}
+            {% Endfor %}
+        5.定义注释（暂未实现）:
+            {# 这是一个注释 #}
+        注意：支持一个HTML文件内同时定义多个For与If语句但不支持其之间的相互嵌套
       注意：传入的变量必须与模板中定义的变量匹配，并且以key=value的形式传递给渲染函数
     """
 
@@ -360,6 +367,12 @@ class FeaspTemplate:
 
         # 保存从self.text中匹配的所有的模板变量、语句
         self.snippet_list: list[str] = re.split("({{.*?}}|{%.*?%})", self.text, flags=re.DOTALL)
+
+        # 保存从HTML解析的语句代码段
+        self.grammar_snippet: list[str] = []
+
+        # 保存从HTML解析的if语句代码段
+        self.if_snippet: list[str] = []
 
         # 保存从HTML解析的for语句代码段
         self.for_snippet: list[str] = []
@@ -390,6 +403,8 @@ class FeaspTemplate:
         """
           处理所有匹配的代码段
         """
+        is_grammar_snippet = False
+        is_if_snippet = False  # 标记它是否为if语句代码段
         is_for_snippet = False  # 标记它是否为for语句代码段
 
         for snippet in self.snippet_list:
@@ -398,54 +413,101 @@ class FeaspTemplate:
                 if not is_for_snippet:
                     var_name = snippet[2:-2].strip()
                     snippet = self._get_var_value(var_name)
-            # 解析模板语句
+                is_grammar_snippet = False
+            # 给for语句在最终HTML字符串中占位
             elif snippet.startswith("{%"):
                 if "in" in snippet:
-                    is_for_snippet = True
-                    self.finally_result.append("{}")
+                    is_for_snippet = True   # 标记
+                elif "If" in snippet:
+                    is_if_snippet = True   # 标记
                 else:
-                    is_for_snippet = False
                     snippet = ""
+                    is_if_snippet = False
+                    is_for_snippet = False
+                is_grammar_snippet = True
 
             if is_for_snippet:
-                # 如果是for语句代码段，它需要处理两次并临时保存到for语句片段列表中
+                # 如果是for语句代码段，它需要添加至self.for_snippet以待处理
                 self.for_snippet.append(snippet)
+                self.grammar_snippet.append(snippet)
+            elif is_if_snippet:
+                # 如果是if语句代码段，它需要添加至self.if_snippet以待处理
+                self.if_snippet.append(snippet)
+                self.grammar_snippet.append(snippet)
             else:
                 # 如果是模板变量，则将变量值直接附加到结果列表
                 self.finally_result.append(snippet)
 
-    def _parse_for_snippet(self) -> list[str]:
+        for snippet in self.snippet_list:
+            # 将语法语句作为整体进行处理，预留一个空位即可
+            if snippet.startswith("{%"):
+                self.finally_result.append("{}")
+                break
+
+    def _parse_for_snippet(self, words: list) -> list[str]:
         """
           解析for语句片段的代码
         """
-        result = []  # 保存for语句片段的解析结果
-        if self.for_snippet:
-            # 解析for语句以启动代码片段
-            words = self.for_snippet[0][2:-2].strip().split()
-            iter_obj_from_context = self.context.get(words[-1])
-            for value in iter_obj_from_context:
-                for snippet in self.for_snippet[1:]:
-                    if snippet.startswith("{{"):
-                        var = snippet[2:-2].strip()
-                        if "." not in var:
-                            snippet = value
-                        else:
-                            obj, attr = var.split(".")
-                            snippet = getattr(value, attr)
-                    if not isinstance(snippet, str):
-                        snippet = str(snippet)
-                    result.append(snippet)
+        result = []   # 保存for语句片段的解析结果
+        iter_obj_from_context = self.context.get(words[-1])
+        for value in iter_obj_from_context:
+            for snippet in self.for_snippet[1:]:
+                if snippet.startswith("{{"):
+                    var = snippet[2:-2].strip()
+                    if "." not in var:
+                        snippet = value
+                    else:
+                        obj, attr = var.split(".")
+                        snippet = getattr(value, attr)
+                if not isinstance(snippet, str):
+                    snippet = str(snippet)
+                result.append(snippet)
+        return result
+
+    def _parse_if_snippet(self, words: list) -> list[str]:
+        """
+          解析if语句片段的代码
+        """
+        result = []   # 保存if语句片段的解析结果
+        if_obj_from_context = self.context.get(words[-1])
+        if if_obj_from_context:
+            for snippet in self.if_snippet[1:]:
+                if snippet.startswith("{{"):
+                    var = snippet[2:-2].strip()
+                    if "." not in var:
+                        snippet = value
+                    else:
+                        obj, attr = var.split(".")
+                        snippet = getattr(value, attr)
+                if not isinstance(snippet, str):
+                    snippet = str(snippet)
+                result.append(snippet)
+        return result
+
+    def _parse_grammar_snippet(self) -> list[str]:
+        """
+          处理语法语句代码片段，
+          支持在同一HTML文件内定义多个控制语句但不支持其之间的嵌套关系
+        """
+        result = []
+        if self.grammar_snippet:
+            for snippet in self.grammar_snippet:
+                words = snippet[2:-2].strip().split()
+                if words[0] == "If":
+                    if_result = self._parse_if_snippet(words)
+                    result.extend(if_result)
+                if words[0] == "For":
+                    for_result = self._parse_for_snippet(words)
+                    result.extend(for_result)
         return result
 
     def render(self) -> str:
         """
-          将self.finally_result与for_result合并，
-          self.finally_result为还未结合类似于for语句这样的执行结果的字符串列表，
-          for_result为已经解析并得到了for循环结果的字符串列表
+          将self.finally_result与result合并，
+          self.finally_result为还未结合类似于for语句这样的执行结果的字符串列表
         """
-        # 获取 for 语句片段的解析结果
-        for_result = self._parse_for_snippet()
-        return "".join(self.finally_result).format("".join(for_result))
+        result = self._parse_grammar_snippet()
+        return "".join(self.finally_result).format("".join(result))
 
     def __repr__(self) -> str:
         return f"<{type(self).__name__} {self.context}>"
