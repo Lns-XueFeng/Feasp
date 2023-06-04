@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <title>Title</title>
+</head>
+<body>
+    <ol>
+        {% If name_list %}
+            <h1 class="title">If_For_Three:</h1>
+        {% Endif %}
+        {% For name in name_list %}
+            <h2>Hello {{ name }}</h2>
+        {% Endfor %}
+    </ol>
+</body>
+</html>

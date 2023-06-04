@@ -2,15 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <link rel="icon" type="text/css" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <title>Title</title>
 </head>
 <body>
     <ol>
         <h1 class="title">Three: </h1>
-        {% for name in name_list %}
+        {% For name in name_list %}
             <h2>Hello {{ name }}</h2>
-        {% endfor %}
+        {% Endfor %}
     </ol>
 </body>
 </html>
