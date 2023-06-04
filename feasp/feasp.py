@@ -352,7 +352,7 @@ class FeaspTemplate:
             {% For name in name_list %}
                 {{ name }}
             {% Endfor %}
-        5.定义注释（暂未实现）:
+        5.定义注释:
             {# 这是一个注释 #}
         注意：支持一个HTML文件内同时定义多个For与If语句但不支持其之间的相互嵌套
       注意：传入的变量必须与模板中定义的变量匹配，并且以key=value的形式传递给渲染函数
@@ -366,7 +366,7 @@ class FeaspTemplate:
         self.context: dict = context
 
         # 保存从self.text中匹配的所有的模板变量、语句
-        self.snippet_list: list[str] = re.split("({{.*?}}|{%.*?%})", self.text, flags=re.DOTALL)
+        self.snippet_list: list[str] = re.split("({{.*?}}|{%.*?%}|{#.*?#})", self.text, flags=re.DOTALL)
 
         # 保存从HTML解析的语句代码段
         self.grammar_snippet: list[str] = []
@@ -376,6 +376,9 @@ class FeaspTemplate:
 
         # 保存从HTML解析的for语句代码段
         self.for_snippet: list[str] = []
+
+        # 保存从HTML解析的注释语句代码段
+        self.comments_snippet: list[str] = []
 
         # 保存最终渲染拼接完的HTML字符串
         self.finally_result: list[str] = []
@@ -403,9 +406,10 @@ class FeaspTemplate:
         """
           处理所有匹配的代码段
         """
-        is_grammar_snippet = False
-        is_if_snippet = False  # 标记它是否为if语句代码段
-        is_for_snippet = False  # 标记它是否为for语句代码段
+        is_grammar_snippet = False   # 标记它是否是控制语句代码段
+        is_if_snippet = False   # 标记它是否为if语句代码段
+        is_for_snippet = False   # 标记它是否为for语句代码段
+        is_comments_snippet = False   # 标记它是否是注释代码段
 
         for snippet in self.snippet_list:
             # 解析模板变量
@@ -414,6 +418,8 @@ class FeaspTemplate:
                     var_name = snippet[2:-2].strip()
                     snippet = self._get_var_value(var_name)
                 is_grammar_snippet = False
+            elif snippet.startswith("{#"):
+                is_comments_snippet = True   # 标记
             # 给for语句在最终HTML字符串中占位
             elif snippet.startswith("{%"):
                 if "in" in snippet:
@@ -424,7 +430,9 @@ class FeaspTemplate:
                     snippet = ""
                     is_if_snippet = False
                     is_for_snippet = False
-                is_grammar_snippet = True
+                is_grammar_snippet = True   # 标记
+            else:
+                is_comments_snippet = False
 
             if is_for_snippet:
                 # 如果是for语句代码段，它需要添加至self.for_snippet以待处理
@@ -434,6 +442,9 @@ class FeaspTemplate:
                 # 如果是if语句代码段，它需要添加至self.if_snippet以待处理
                 self.if_snippet.append(snippet)
                 self.grammar_snippet.append(snippet)
+            elif is_comments_snippet:
+                # 如果是注释语句代码段，将它添加至self.comments_snippet什么也不干
+                self.comments_snippet.append(snippet)
             else:
                 # 如果是模板变量，则将变量值直接附加到结果列表
                 self.finally_result.append(snippet)
