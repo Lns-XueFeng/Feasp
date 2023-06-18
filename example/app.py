@@ -109,7 +109,7 @@ def make_resp():
 
 @app.route("/see_my_func", methods=["GET"])
 def see_funcs():
-    # 可以查看app.py定义的所有的相对路径与函数的映射 <url： func>
+    # 可以查看app.py定义的所有的相对路径与函数的映射 <url: func>
     return app.url_func_map
 
 
