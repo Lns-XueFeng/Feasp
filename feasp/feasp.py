@@ -15,6 +15,7 @@ import os
 import json
 import re
 import typing as t
+import wsgiref
 
 
 METHOD: dict[str, str] = {
@@ -142,7 +143,7 @@ class Request:
     @property
     def url(self) -> str:
         """ 获取用户易于使用的完整网址 """
-        return self.__url
+        return wsgiref.util.request_uri(self.__environ)
 
     @property
     def form(self) -> dict:
@@ -167,7 +168,8 @@ class Request:
     @property
     def url_scheme(self) -> str:
         """ WSGI支持的HTTP协议 """
-        return self.environ.get("wsgi.url_scheme", "")
+        # self.environ.get("wsgi.url_scheme", "")
+        return wsgiref.util.guess_scheme(self.__environ)
 
     @property
     def referer(self) -> str:
@@ -340,7 +342,7 @@ class Response:
 class FeaspTemplate:
     """
       Template是一个渲染类，用于解析HTML并重新拼接的模板，
-      当前，支持定义变量、定义url_for函数、单层for循环：
+      当前，支持定义变量、定义url_for函数、单个If语句、单层For循环：
         1.定义变量的占位符为: {{}},
         变量在花括号内定义，例如 {{ name }}
         2.定义url_for函数: {{ url_for('static', filename='head.jpg') }}
@@ -348,7 +350,7 @@ class FeaspTemplate:
             {% If name_list: %}
                 {{ name_list[0] }}
             {% Endif %}
-        4.定义循环（目前仅能定义单个且单层for循环）:
+        4.定义循环语句（目前仅能定义单个且单层For循环）:
             {% For name in name_list %}
                 {{ name }}
             {% Endfor %}
@@ -417,7 +419,6 @@ class FeaspTemplate:
                 if not is_for_snippet:
                     var_name = snippet[2:-2].strip()
                     snippet = self._get_var_value(var_name)
-                is_grammar_snippet = False
             elif snippet.startswith("{#"):
                 is_comments_snippet = True   # 标记
             # 给for语句在最终HTML字符串中占位
@@ -432,6 +433,7 @@ class FeaspTemplate:
                     is_for_snippet = False
                 is_grammar_snippet = True   # 标记
             else:
+                is_grammar_snippet = False
                 is_comments_snippet = False
 
             if is_for_snippet:
@@ -538,8 +540,7 @@ class FeaspServer:
         from wsgiref.simple_server import make_server
         from wsgiref.simple_server import WSGIRequestHandler, WSGIServer
 
-        f_srv = make_server(self.host, self.port, app, WSGIServer,
-                            WSGIRequestHandler)
+        f_srv = make_server(self.host, self.port, app, WSGIServer, WSGIRequestHandler)
         self.port = f_srv.server_port
         try:
             print(f"{self.__class__.__name__} working on {self.port}...")
@@ -795,7 +796,7 @@ def url_for(
         endpoint: str,
         filename: t.Optional[str] = None) -> str:
     """
-      提供一哥使构建路径更容易的函数，支持在视图或模板中定义，
+      提供一个使构建路径更容易的函数，支持在视图或模板中定义，
       具体使用见example目录: example/templates/index.html和example/app.py/redirect_
       :raise FeaspNotFound
     """
