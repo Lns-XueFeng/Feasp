@@ -16,6 +16,7 @@ import json
 import re
 import typing as t
 import wsgiref
+import sqlite3
 
 from .config import *
 
@@ -186,49 +187,7 @@ class Response:
       支持字节和非字节的数据进行包装并返回
     """
 
-    reason_phrase: dict[int, str] = {
-        100: "CONTINUE",
-        101: "SWITCHING PROTOCOLS",
-        200: "OK",
-        201: "CREATED",
-        202: "ACCEPTED",
-        203: "NON-AUTHORITATIVE INFORMATION",
-        204: "NO CONTENT",
-        205: "RESET CONTENT",
-        206: "PARTIAL CONTENT",
-        300: "MULTIPLE CHOICES",
-        301: "MOVED PERMANENTLY",
-        302: "FOUND",
-        303: "SEE OTHER",
-        304: "NOT MODIFIED",
-        305: "USE PROXY",
-        306: "RESERVED",
-        307: "TEMPORARY REDIRECT",
-        400: "BAD REQUEST",
-        401: "UNAUTHORIZED",
-        402: "PAYMENT REQUIRED",
-        403: "FORBIDDEN",
-        404: "NOT FOUND",
-        405: "METHOD NOT ALLOWED",
-        406: "NOT ACCEPTABLE",
-        407: "PROXY AUTHENTICATION REQUIRED",
-        408: "REQUEST TIMEOUT",
-        409: "CONFLICT",
-        410: "GONE",
-        411: "LENGTH REQUIRED",
-        412: "PRECONDITION FAILED",
-        413: "REQUEST ENTITY TOO LARGE",
-        414: "REQUEST-URI TOO LONG",
-        415: "UNSUPPORTED MEDIA TYPE",
-        416: "REQUESTED RANGE NOT SATISFIABLE",
-        417: "EXPECTATION FAILED",
-        500: "INTERNAL SERVER ERROR",
-        501: "NOT IMPLEMENTED",
-        502: "BAD GATEWAY",
-        503: "SERVICE UNAVAILABLE",
-        504: "GATEWAY TIMEOUT",
-        505: "HTTP VERSION NOT SUPPORTED",
-    }
+    reason_phrase: dict[int, str] = REASON_PHRASE
 
     def __init__(
             self,
@@ -680,6 +639,143 @@ class Feasp:
         """
         simple_server = FeaspServer(host, port)
         simple_server.run(self.wsgi_apl)
+
+
+class SimpleSqlite:
+    """
+      SimpleSqlite基于Sqlite3提供了更简单便捷的方式来进行数据库的简单的增删改查
+
+      简单使用举例一：
+        from feasp import SimpleSqlite
+
+        handler = SimpleSqlite("test.db")
+        handler.create_table("Student", ["Name", "Age"])
+        handler.insert("Student", ("Lns_XueFeng", 22))
+        handler.insert_many("Student", [("XueFeng", 22), ("XueXue", 25), ("XueLian", 28)])
+        handler.delete("Student", {"Name": "Lns_XueFeng", "Age": 22})
+        handler.update("Student", {"Name": "Lns-XueFeng"}, ("Name", "Lns_XueFeng"))
+        res = handler.fetch_all("Student")
+        print(res)
+        handler.close()
+
+      简单使用举例二：
+        from feasp import SimpleSqlite
+
+        with SimpleSqlite("test.db") as handler:
+            handler.create_table("Student", ["Name", "Age"])
+            handler.insert("Student", ("Lns_XueFeng", 22))
+            handler.insert_many("Student", [("XueFeng", 22), ("XueXue", 25), ("XueLian", 28)])
+            handler.delete("Student", {"Name": "Lns_XueFeng", "Age": 22})
+            handler.update("Student", {"Name": "Lns-XueFeng"}, ("Name", "Lns_XueFeng"))
+            res = handler.fetch_all("Student")
+            print(res)
+
+      注意：create_table不可重复调用，数据库表不可重复，不要重复的去创建同名表
+    """
+
+    def __init__(self, db_name: str):
+        self.__conn = sqlite3.connect(f"{db_name}")
+        self.__cursor = self.__conn.cursor()
+
+    def create_table(self, tb_name: str, colum_name: list[str]) -> None:
+        """
+          :param tb_name: 数据库表的名称
+          :param colum_name_and_type: 一个字典，键是列名，值是列的类型
+        """
+        count = 1
+        create_table_sql = f"CREATE TABLE {tb_name}("
+
+        for c_name in colum_name:
+            if count == 1:
+                create_table_sql += f"{c_name}"
+                count = count + 1
+            else:
+                create_table_sql += f", {c_name}"
+        create_table_sql += ')'
+
+        self.__cursor.execute(create_table_sql)
+        self.__conn.commit()
+
+    def insert(self, tb_name: str, value: tuple) -> None:
+        """
+          :param tb_name: 数据库表的名称
+          :param values: 需要给每一列添加的值
+        """
+        insert_column_sql = f"INSERT INTO {tb_name} VALUES {value}"
+
+        self.__cursor.execute(insert_column_sql)
+        self.__conn.commit()
+
+    def insert_many(self, tb_name: str, values: list[tuple]) -> None:
+        """
+          :param tb_name: 数据库表的名称
+          :param values: 需要添加的多行数据
+        """
+        for value in values:
+            self.insert(tb_name, value)
+
+    def delete(self, tb_name, column_and_value: dict) -> None:
+        """
+          :param tb_name: 数据库表的名称
+          :param column_and_value: 键为列名，值为列对应多个行值中需要删除的
+        """
+        count = 1
+        delete_column_sql = f"DELETE FROM {tb_name} where"
+
+        for c_name, v_name in column_and_value.items():
+            condition = f" {c_name}='{v_name}'"
+            if count == 1:
+                delete_column_sql += condition
+                count = count + 1
+            else:
+                delete_column_sql += " and" + condition
+
+        self.__cursor.execute(delete_column_sql)
+        self.__conn.commit()
+
+    def update(self, tb_name, column_and_value: dict, row: tuple) -> None:
+        """
+          :param tb_name: 数据库表的名称
+          :param column_and_value: 键为需修改的列名，值为要修改的新值
+          :param row: 此元组用来确定需修改的行，第一个元素为列名，第二个元素为这一列的元素
+        """
+        assert len(row) == 2
+        count = 1
+        update_column_sql = f"UPDATE {tb_name} set"
+
+        for c_name, v_name in column_and_value.items():
+            condition = f" {c_name}='{v_name}'"
+            if count == 1:
+                update_column_sql += condition
+                count = count + 1
+            else:
+                update_column_sql += " and" + condition
+        update_column_sql += f" where {row[0]}='{row[1]}'"
+
+        self.__cursor.execute(update_column_sql)
+        self.__conn.commit()
+
+    def fetch_all(self, tb_name: str) -> list:
+        """
+          :param tb_name: 数据库表的名称
+        """
+        fetch_all_sql = f"SELECT * FROM {tb_name}"
+
+        result = self.__cursor.execute(fetch_all_sql)
+        self.__conn.commit()
+        return result.fetchall()
+
+    def close(self):
+        """ 操作完成时调用此方法关闭游标以及连接 """
+        self.__cursor.close()
+        self.__conn.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.__cursor.close()
+        self.__conn.close()
 
 
 def make_response(
