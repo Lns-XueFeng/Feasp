@@ -97,7 +97,7 @@ REASON_PHRASE: dict[int, str] = {
         503: "SERVICE UNAVAILABLE",
         504: "GATEWAY TIMEOUT",
         505: "HTTP VERSION NOT SUPPORTED",
-    }
+}
 
 
 class FeaspNotFound(Exception):
