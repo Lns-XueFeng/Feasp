@@ -7,7 +7,7 @@ Create Time: 2023.03.27
 
 
 __author__ = "Lns-XueFeng"
-__version__ = "0.7"
+__version__ = "0.8"
 __license__ = "MIT"
 
 
