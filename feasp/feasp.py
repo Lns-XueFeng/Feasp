@@ -674,8 +674,12 @@ class SimpleSqlite:
     """
 
     def __init__(self, db_name: str):
-        self.__conn = sqlite3.connect(f"{db_name}")
+        self.__db_name = db_name
+        self.__conn = sqlite3.connect(f"{self.__db_name}")
         self.__cursor = self.__conn.cursor()
+
+    def __repr__(self):
+        return f"<SimpleSqlite Database: {self.__db_name}>"
 
     def create_table(self, tb_name: str, colum_name: list[str]) -> None:
         """
