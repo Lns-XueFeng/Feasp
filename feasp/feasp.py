@@ -17,6 +17,7 @@ import re
 import typing as t
 import wsgiref
 import sqlite3
+from contextlib import contextmanager
 
 from .config import *
 
@@ -851,6 +852,28 @@ def url_for(
         request_url = os.path.join(base_url, endpoint, filename)
         return request_url
     raise FeaspNotFound("not found view function")
+
+
+@contextmanager
+def connect(db_name: str) -> None:
+    """
+      提供一个更为简洁明了且安全的接口以供对SimpleSqlite的使用
+      使用示例（推荐使用此接口，而不是直接使用SimpleSqlite）：
+      with connect('test.db') as handler:
+          handler.create_table("Student", ["Name", "Age"])
+          handler.insert("Student", ("Lns_XueFeng", 22))
+          handler.insert_many("Student", [("XueFeng", 22), ("XueXue", 25), ("XueLian", 28)])
+          handler.delete("Student", {"Name": "Lns_XueFeng", "Age": 22})
+          handler.update("Student", {"Name": "Lns-XueFeng"}, ("Name", "Lns_XueFeng"))
+          res = handler.fetch_all("Student")
+          print(res)
+      注意：create_table不可重复调用，数据库表不可重复，不要重复的去创建同名表
+    """
+    try:
+        handler = SimpleSqlite(db_name)
+        yield handler
+    finally:
+        handler.close()
 
 
 _global_var: dict[t.Any, t.Any] = {}  # 保存一些需要全局使用的变量
