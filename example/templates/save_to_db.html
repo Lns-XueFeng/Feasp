@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <title>Title</title>
+</head>
+<body>
+    <div>
+        <form action="/save_to_db" method="POST">
+          <label for="username">username:</label><br>
+          <input type="text" id="username" name="username"><br>
+          <label for="password">password:</label><br>
+          <input type="password" id="password" name="password"><br>
+          <input type="submit" value="login">
+        </form>
+    </div>
+</body>
+</html>
