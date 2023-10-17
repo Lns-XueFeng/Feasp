@@ -1,5 +1,5 @@
 from feasp import Feasp
-from feasp import render_template, url_for, redirect, make_response
+from feasp import render_template, url_for, redirect, make_response, connect, request, session
 
 
 """
@@ -11,9 +11,9 @@ from feasp import render_template, url_for, redirect, make_response
 
 # 提供Feasp类来构建应用程序实例，
 # 然后你可以使用这个程序实例来做一些事情，
-# 例如在进入上下文时可使用app.response.set_cookie(), app.request.method/cookies,...
+# 例如在进入上下文时可使用session, request.method/cookies,...
 # app.response提供了: status, mimetype, headers, set_cookie()
-# app.request 提供了: url, method, cookies, ...
+# request 提供了: url, method, cookies, ...
 app = Feasp(__name__)
 
 
@@ -52,19 +52,19 @@ def redirect_():
 
 @app.route("/set_cookies", methods="GET")
 def set_cookies():
-    # 使用app.response.set_cookies()让浏览器设置cookie
-    app.response.set_cookie("Name", "XueFeng")
-    # response.set_cookie会忽略空间，因此会被设置为WriteCode字符串
-    app.response.set_cookie("Hobby", "Write Code")
+    # 使用session来设置浏览器的cookie
+    session["Name"] = "XueFeng"
+    # session会忽略空格，因此会被设置为WriteCode字符串
+    session["Hobby"] = "Write Code"
     return "Set Cookies"
 
 
 @app.route("/show_cookies", methods=["GET"])
 def show_cookies():
-    # 使用app.request.cookie获取浏览器传递来的cookie
-    if len(app.request.cookies) > 0:
+    # 使用request.cookie获取浏览器传递来的cookie
+    if len(request.cookies) > 0:
         cookies = ""
-        for k, v in app.request.cookies.items():
+        for k, v in request.cookies.items():
             cookies += f"{k}={v};"
         return f"Show Cookies: {cookies}"
     return "No Cookies"
@@ -72,17 +72,23 @@ def show_cookies():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if app.request.method == "POST":
-        form = app.request.form
+    if request.method == "POST":
+        form = request.form
+        if len(form) == 0:
+            return "Please Input user and password !"
+
         username = form["username"]
         password = form["password"]
-        if username == "XueFeng" and password == "123456789":
-            # 使用app.response.set_cookies()让浏览器设置并存储cookie
-            # 如果你需要读取cookie，你可以这样做：app.request.cookie
-            app.response.set_cookie("username", username)
-            app.response.set_cookie("password", password)
+        if username == "Lns-XueFeng" and password == "123456789":
+            # 使用session让浏览器设置并存储cookie
+            # 如果你需要读取cookie，你可以这样做：request.cookie
+            session["username"] = username
+            session["password"] = password
             # 此时，可以考虑实现@login_required装饰器
-            return "Your login correctly !"
+            return "Your login message correctly !"
+        else:
+            return "Your login message incorrectly !"
+
     return render_template("login.html")
 
 
@@ -123,6 +129,28 @@ def if_control():
 def if_and_for():
     name_list = ["XueLian", "XueXue", "XueFeng"]
     return render_template("If_For.html", name_list=name_list)
+
+
+@app.route("/save_to_db", methods=["GET", "POST"])
+def save_to_db():
+    with connect("feasp.db") as handler:
+        first_user_tuple = handler.fetch_all("UserLogin")[0]
+
+    if request.method == "POST":
+        form = request.form
+        if len(form) == 0:
+            return "Please Input user and password !"
+
+        username = form["username"]
+        password = form["password"]
+        if username == first_user_tuple[0] and password == str(first_user_tuple[1]):
+            session["username"] = username
+            session["password"] = password
+            return "Your login message correctly !"
+        else:
+            return "Your login message incorrectly !"
+
+    return render_template("save_to_db.html")
 
 
 if __name__ == "__main__":
