@@ -1,6 +1,7 @@
 """
 Author: Lns-XueFeng
 Create Time: 2023.03.27
+Python Version: 3.9
 
 目的: 通过实现一个简单的Web框架来增强我对Web开发的理解
 """
@@ -14,12 +15,16 @@ __license__ = "MIT"
 import os
 import json
 import re
+import warnings
 import typing as t
 import wsgiref
 import sqlite3
 from contextlib import contextmanager
 
-from .config import *
+from werkzeug.local import LocalStack, LocalProxy
+
+from .config import METHOD, REASON_PHRASE
+from .config import FEASP_ERROR, FeaspNotFound, NotSupportType
 
 
 def _fetch_images(image_path: str) -> bytes:
@@ -240,6 +245,40 @@ class Response:
                f" {self.status} {self.reason_phrase[self.status]}>"
 
 
+class _RequestContext:
+    """
+      _RequestContext是一个请求上下文类（在Feasp中使用）
+      通过在利用with语句使用_RequestContext的过程中压入与弹出它本身来实现不同用户的相关隔离
+      此类代指了app, request, session等，用于实现全局可用但不会错乱的对象供用户使用
+      简单使用的代码示例：
+        req_ctx = _RequestContext(self, environ)
+        with req_ctx:
+            request = req_ctx.request
+            ...
+        with _RequestContext(self, environ):
+            request = req_ctx.request
+            ...
+    """
+
+    def __init__(self, app, environ: dict):
+        # 指向Feasp的实例对象
+        self.app = app
+        # 指向框架用户的url和func的映射关系
+        self.url_func_map: dict = app.url_func_map
+        # 指向请求的相关解析信息
+        self.request: Request = app.request_class(environ)
+        # 会话对象用于设置cookie
+        self.session: dict = {}
+
+    def __enter__(self):
+        _request_ctx_stack.push(self)
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_tb is None:
+            _request_ctx_stack.pop()
+
+
 class FeaspTemplate:
     """
       Template是一个渲染类，用于解析HTML并重新拼接的模板，
@@ -448,6 +487,7 @@ class FeaspServer:
             print(f"Please click `http://{self.host}:{self.port}`...")
             f_srv.serve_forever()
         except KeyboardInterrupt:
+            warnings.warn("A KeyboardInterrupt was happend...")
             f_srv.server_close()
             raise
 
@@ -497,14 +537,8 @@ class Feasp:
         self.__user_pkg_abspath: str = os.path.abspath(os.path.dirname(filename))
         _global_var["user_pkg_abspath"] = self.__user_pkg_abspath
 
-        # 指向用户可以访问的当前请求对象，在进入上下文时可用
-        self.request: t.Any = None
-
-        # 指向当前响应对象，该对象可用于用户设置，在进入上下文时可用
-        self.response: t.Any = None
-
     @property
-    def url_func_map(self):
+    def url_func_map(self) -> dict:
         """
           让用户可以查看相对路径与视图函数的映射
         """
@@ -518,9 +552,7 @@ class Feasp:
         return url_and_func
 
     @staticmethod
-    def _deal_static_request(
-            path: str
-    ) -> t.Optional[tuple[t.Union[str, bytes], str, int]]:
+    def _deal_static_request(path: str) -> t.Optional[tuple[t.Union[str, bytes], str, int]]:
         """
           处理对图像、CSS和js文件的请求
         """
@@ -540,12 +572,7 @@ class Feasp:
                 content = _fetch_files(path)
                 return content, 200, mimetype
 
-    def _deal_view_func(
-            self,
-            func: t.Callable,
-            path: str,
-            methods: list[str]
-    ) -> None:
+    def _deal_view_func(self, func: t.Callable, path: str, methods: list[str]) -> None:
         """
           处理视图函数中定义的路径
         """
@@ -557,11 +584,7 @@ class Feasp:
         else:
             self.__url_func_map[path] = (endpoint, func, methods)
 
-    def dispatch(
-            self,
-            path: str,
-            method: str
-    ) -> tuple[t.Union[str, bytes], str, int]:
+    def dispatch(self, path: str, method: str) -> tuple[t.Union[str, bytes], str, int]:
         """
           处理传来的请求并返回对相应视图函数的响应
         """
@@ -616,23 +639,40 @@ class Feasp:
             return func
         return decorator
 
-    def wsgi_apl(
-            self,
-            environ: dict,
-            start_response: t.Callable) -> list[bytes]:
+    def request_context(self, environ: dict) -> _RequestContext:
+        """
+          包装_RequestContext，以提供更清晰的代码逻辑
+        """
+        return _RequestContext(self, environ)
+
+    def make_response(self, body: str, status: int, mimetype: str) -> Response:
+        """
+          抽象出处理response的过程，以提供更清晰的代码逻辑
+        """
+        response = self.response_class()
+        response.body = body
+        response.status = status
+        response.mimetype = mimetype
+        if session is not None:
+            for k, v in session.items():
+                response.set_cookie(k, v)
+            session.clear()
+        return response
+
+    def wsgi_apl(self, environ: dict, start_response: t.Callable) -> list[bytes]:
         """
           符合WSGI规定的可调用的应用程序，
           定义的参数为environ、start_response，
           environ：包括所有请求，start_response：可调用对象
         """
-        self.request = self.request_class(environ)
-        self.response = self.response_class()
-        # -------------------------------------------------------------------------------
-        body, status, mimetype = self.dispatch(self.request.path, self.request.method)
-        # -------------------------------------------------------------------------------
-        self.response.mimetype = mimetype
-        self.response.body, self.response.status = body, status
-        return self.response(environ, start_response)
+        req_ctx = self.request_context(environ)
+        with req_ctx:
+            request = req_ctx.request
+            # -------------------------------------------------------------------------------
+            body, status, mimetype = self.dispatch(request.path, request.method)
+            # -------------------------------------------------------------------------------
+            response = self.make_response(body, status, mimetype)
+            return response(environ, start_response)
 
     def run(self, host: str, port: int) -> None:
         """
@@ -797,9 +837,7 @@ def make_response(
     return Response(*FEASP_ERROR["HTTP_500"])
 
 
-def render_template(
-        filename: str,
-        **context: dict) -> str:
+def render_template(filename: str, **context: dict) -> str:
     """
       渲染在templates目录下的HTML文件，
       因此你需要将所有HTML文件放置在templates目录里面，
@@ -834,9 +872,7 @@ def redirect(request_url: str) -> str:
     raise FeaspNotFound("not found view function")
 
 
-def url_for(
-        endpoint: str,
-        filename: t.Optional[str] = None) -> str:
+def url_for(endpoint: str, filename: t.Optional[str] = None) -> str:
     """
       提供一个使构建路径更容易的函数，支持在视图或模板中定义，
       具体使用见example目录: example/templates/index.html和example/app.py/redirect_
@@ -876,4 +912,7 @@ def connect(db_name: str) -> None:
         handler.close()
 
 
-_global_var: dict[t.Any, t.Any] = {}  # 保存一些需要全局使用的变量
+_global_var: dict[t.Any, t.Any] = {}
+_request_ctx_stack: LocalStack = LocalStack()
+request: Request = LocalProxy(lambda: _request_ctx_stack.top.request)   # 供用户使用的全局request对象
+session: dict = LocalProxy(lambda: _request_ctx_stack.top.session)   # 供用户使用的全局session对象
