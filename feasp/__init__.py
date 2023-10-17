@@ -1,5 +1,5 @@
 from .feasp import Feasp
-from .feasp import render_template, url_for, redirect, make_response, connect
+from .feasp import render_template, url_for, redirect, make_response, connect, request, session
 
 
 __all__ = [
@@ -9,4 +9,6 @@ __all__ = [
     redirect,
     make_response,
     connect,
+    request,
+    session,
 ]
