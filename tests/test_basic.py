@@ -15,8 +15,9 @@ class TestBasic(unittest.TestCase):
         @app.route("/say/<string:name>", methods=["GET"])
         def say(name):
             pass
+
         self.assertIn("/hello", app.url_func_map)
-        self.assertIn("/say", app.url_func_map["path_have_var"])
+        self.assertIn("/say", app.url_func_map)
 
     def test_request(self):
         environ = {
