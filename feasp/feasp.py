@@ -8,23 +8,27 @@ Python Version: 3.9
 
 
 __author__ = "Lns-XueFeng"
-__version__ = "0.8"
+__version__ = "1.0"
 __license__ = "MIT"
 
 
 import os
-import json
 import re
-import warnings
-import typing as t
+import json
+import threading
 import wsgiref
 import sqlite3
+import warnings
+import typing as t
+
+from threading import local
 from contextlib import contextmanager
 
-from werkzeug.local import LocalStack, LocalProxy
-
-from .config import METHOD, REASON_PHRASE
-from .config import FEASP_ERROR, FeaspNotFound, NotSupportType
+from .config import METHOD
+from .config import FEASP_ERROR
+from .config import REASON_PHRASE
+from .config import FeaspNotFound
+from .config import NotSupportType
 
 
 def _fetch_images(image_path: str) -> bytes:
@@ -92,6 +96,11 @@ class Request:
     def url(self) -> str:
         """ 获取用户易于使用的完整网址 """
         return wsgiref.util.request_uri(self.__environ)
+
+    @property
+    def http_host(self) -> str:
+        """ 获取请求的IP和端口号 """
+        return self.environ.get("HTTP_HOST", "")
 
     @property
     def form(self) -> dict:
@@ -243,6 +252,52 @@ class Response:
     def __repr__(self) -> str:
         return f"<{type(self).__name__} {self.mimetype}" \
                f" {self.status} {self.reason_phrase[self.status]}>"
+
+
+class LocalProxy:
+    """
+      LocalProxy：通过这个类来代理不同的对象
+      此LocalProxy支持对象属性的获取，对字典的查询，增加，删除
+    """
+
+    def __init__(self, func: t.Callable):
+        self._func: t.Callable = func
+
+    def __getattr__(self, name):
+        return getattr(self._func(), name)
+
+    def __getitem__(self, item):
+        return self._func()[item]
+
+    def __setitem__(self, key, value):
+        self._func()[key] = value
+
+    def __delitem__(self, key):
+        del self._func()[key]
+
+
+class LocalStack:
+    """
+      LocalStack：基于threading.local实现一个栈数据结构
+      当使用_RequestContext进入上下文时会将相关的对象压入栈，出上下文时会将相关的对象弹出栈
+      基于此可以实现一个通过代理得到的上下文的全局对象供用户使用
+    """
+
+    def __init__(self):
+        # 基于threading的本地线程
+        self._local: threading.local = local()
+        # 创建一个容器作为栈
+        self._local.stack: list = []
+
+    def push(self, item):
+        self._local.stack.append(item)
+
+    def pop(self):
+        return self._local.stack.pop()
+
+    @property
+    def top(self):
+        return self._local.stack[-1]
 
 
 class _RequestContext:
@@ -550,6 +605,13 @@ class Feasp:
             else:
                 url_and_func[k] = self.__url_func_map[k][0]
         return url_and_func
+    
+    @property
+    def user_pkg_abspath(self):
+        """
+          让用户可以查看用户程序包的绝对路径
+        """
+        return self.__user_pkg_abspath
 
     @staticmethod
     def _deal_static_request(path: str) -> t.Optional[tuple[t.Union[str, bytes], str, int]]:
@@ -715,7 +777,7 @@ class SimpleSqlite:
     """
 
     def __init__(self, db_name: str):
-        self.__db_name = db_name
+        self.__db_name: str = db_name
         self.__conn = sqlite3.connect(f"{self.__db_name}")
         self.__cursor = self.__conn.cursor()
 
@@ -878,13 +940,15 @@ def url_for(endpoint: str, filename: t.Optional[str] = None) -> str:
       具体使用见example目录: example/templates/index.html和example/app.py/redirect_
       :raise FeaspNotFound
     """
+
     if endpoint and not filename:
         url_func_map = _global_var["url_func_map"]
         for path, values in url_func_map.items():
             if endpoint in values:
                 return path
     elif endpoint and filename:
-        base_url = "http://127.0.0.1:8000/"   # 暂时硬编码
+        # base_url = "http://127.0.0.1:8000/"   # 暂时硬编码
+        base_url = request.url_scheme + request.http_host + "/"
         request_url = os.path.join(base_url, endpoint, filename)
         return request_url
     raise FeaspNotFound("not found view function")
@@ -914,5 +978,6 @@ def connect(db_name: str) -> None:
 
 _global_var: dict[t.Any, t.Any] = {}
 _request_ctx_stack: LocalStack = LocalStack()
-request: Request = LocalProxy(lambda: _request_ctx_stack.top.request)   # 供用户使用的全局request对象
-session: dict = LocalProxy(lambda: _request_ctx_stack.top.session)   # 供用户使用的全局session对象
+request: Request = LocalProxy(lambda: _request_ctx_stack.top.request)   # 供用户使用的上下文全局request对象
+session: dict = LocalProxy(lambda: _request_ctx_stack.top.session)   # 供用户使用的上下文全局session对象
+current_app: Feasp = LocalProxy(lambda: _request_ctx_stack.top.app)   # 供用户使用的上下文全局current_app对象
