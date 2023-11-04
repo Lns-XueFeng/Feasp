@@ -42,9 +42,9 @@ def _fetch_images(image_path: str) -> bytes:
 
     if image_path == "/favicon.ico":
         image_path = image_path[1:]
-        filepath = os.path.join(_global_var["user_pkg_abspath"], 'static', image_path)
+        filepath = os.path.join(_global_var["user_pkg_abspath"], "static", image_path)
 
-    elif image_path[0] == "/":
+    elif image_path[0] == '/':
         image_path = image_path[1:]
         filepath = os.path.join(_global_var["user_pkg_abspath"], image_path)
 
@@ -64,12 +64,12 @@ def _fetch_files(link_path: str) -> str:
       :raise FeaspNotFound
     """
 
-    if link_path[0] == "/":
+    if link_path[0] == '/':
         link_path = link_path[1:]
 
     filepath = os.path.join(_global_var["user_pkg_abspath"], link_path)
     if os.path.exists(filepath):
-        with open(filepath, "r", encoding="utf-8") as fp:
+        with open(filepath, 'r', encoding="utf-8") as fp:
             content = fp.read()
         return content
     raise FeaspNotFound(f"not found {link_path}")
@@ -100,7 +100,7 @@ class Request:
     @property
     def http_host(self) -> str:
         """ 获取请求的IP和端口号 """
-        return self.environ.get("HTTP_HOST", "")
+        return self.environ.get("HTTP_HOST", '')
 
     @property
     def form(self) -> dict:
@@ -115,7 +115,7 @@ class Request:
     @property
     def protocol(self) -> str:
         """ HTTP协议类型和版本 """
-        return self.environ.get("SERVER_PROTOCOL", "")
+        return self.environ.get("SERVER_PROTOCOL", '')
 
     @property
     def method(self) -> str:
@@ -125,45 +125,45 @@ class Request:
     @property
     def url_scheme(self) -> str:
         """ WSGI支持的HTTP协议 """
-        # self.environ.get("wsgi.url_scheme", "")
+        # self.environ.get("wsgi.url_scheme", '')
         return wsgiref.util.guess_scheme(self.__environ)
 
     @property
     def referer(self) -> str:
         """ 当前网页的来源页面 """
-        return self.environ.get("HTTP_REFERER", "")
+        return self.environ.get("HTTP_REFERER", '')
 
     @property
     def path(self) -> str:
         """ HTTP请求路径（资源路径） """
-        return self.environ.get("PATH_INFO", "")
+        return self.environ.get("PATH_INFO", '')
 
     @property
     def url_args(self) -> str:
         """ 网址中的查询参数 """
-        return self.environ.get("QUERY_STRING", "")
+        return self.environ.get("QUERY_STRING", '')
 
     @property
     def connection(self) -> str:
         """ HTTP 连接状态码 """
-        return self.environ.get("HTTP_CONNECTION", "")
+        return self.environ.get("HTTP_CONNECTION", '')
 
     @property
     def platform(self) -> str:
         """ HTTP请求来自哪个系统平台 """
-        return self.environ.get("HTTP_SEC_CH_UA_PLATFORM", "")
+        return self.environ.get("HTTP_SEC_CH_UA_PLATFORM", '')
 
     @property
     def user_agent(self) -> str:
         """ 它包含请求客户端的大量身份相关的信息 """
-        return self.environ.get("HTTP_USER_AGENT", "")
+        return self.environ.get("HTTP_USER_AGENT", '')
 
     def __get_form(self) -> dict:
-        if self.environ.get("CONTENT_LENGTH", "") == "":
+        if self.environ.get("CONTENT_LENGTH", "") == '':
             rb_size = 0
         else:
             rb_size = int(self.environ.get("CONTENT_LENGTH", 0))
-        wsgi_input = self.environ.get("wsgi.input", "")
+        wsgi_input = self.environ.get("wsgi.input", '')
         if not wsgi_input == "":
             rb = wsgi_input.read(rb_size)
             from urllib.parse import parse_qs
@@ -177,14 +177,14 @@ class Request:
         cookies = {}
         http_cookie = self.environ.get("HTTP_COOKIE")
         if http_cookie is not None:
-            cl = http_cookie.split(" ")
+            cl = http_cookie.split(' ')
             for kv in cl:
                 k, v = tuple(kv.split("="))
                 cookies[k] = v
         return cookies
 
     def __get_url(self) -> str:
-        url, header = "", ""
+        url, header = '', ''
         http_host = self.environ.get("HTTP_HOST")
         if self.url_scheme:
             header = self.url_scheme + "://"
@@ -392,7 +392,7 @@ class FeaspTemplate:
         elif "url_for" in var_name:   # 支持在template中定义url_for函数
             value = eval(var_name)
         else:  # 处理obj.attr
-            obj, attr = var_name.split(".")
+            obj, attr = var_name.split('.')
             value = getattr(self.context.get(obj), attr)
 
         if not isinstance(value, str):
@@ -462,10 +462,10 @@ class FeaspTemplate:
             for snippet in self.for_snippet[1:]:
                 if snippet.startswith("{{"):
                     var = snippet[2:-2].strip()
-                    if "." not in var:
+                    if '.' not in var:
                         snippet = value
                     else:
-                        obj, attr = var.split(".")
+                        obj, attr = var.split('.')
                         snippet = getattr(value, attr)
                 if not isinstance(snippet, str):
                     snippet = str(snippet)
@@ -485,7 +485,7 @@ class FeaspTemplate:
                     if "." not in var:
                         snippet = value
                     else:
-                        obj, attr = var.split(".")
+                        obj, attr = var.split('.')
                         snippet = getattr(value, attr)
                 if not isinstance(snippet, str):
                     snippet = str(snippet)
@@ -570,7 +570,7 @@ class Feasp:
 
         app = Feasp(__name__)
 
-        @app.route("/", methods=["GET"])
+        @app.route('/', methods=["GET"])
         def index():
             return "Hello Feasp !"
     """
@@ -658,19 +658,22 @@ class Feasp:
         # 处理与视图函数相关的请求
         values = self.__url_func_map.get(path, None)
         variable = None
-        if values is None:  # 确定路径是否携带变量
-            for_path, variable = path.split("/")[:-1], path.split("/")[-1]
+        if values is None:   # 确定路径是否携带变量
+            for_path, variable = path.split('/')[:-1], path.split("/")[-1]
             path = "/".join(for_path)
             values = self.__url_func_map["path_have_var"].get(path, None)
-        if values is None:  # 如果仍为“无”，则引发错误
+        if values is None:   # 如果仍为“无”，则引发错误
             return FEASP_ERROR["HTTP_404"]
 
         # 进入用户上下文----------------------------------
         endpoint, view_func, methods = values
-        if variable:  # 如果有变量，则传入视图函数
-            view_func_return = view_func(variable)
-        else:
-            view_func_return = view_func()
+        try:
+            if not variable:
+                view_func_return = view_func()
+            else:
+                view_func_return = view_func(view_func(variable))
+        except Exception as e:
+            return FEASP_ERROR["HTTP_500"]
         # 退出用户上下文-----------------------------------
 
         if method not in methods:
@@ -678,14 +681,14 @@ class Feasp:
 
         if isinstance(view_func_return, str):
             mimetype = "text/html"
-            return view_func_return, 200, mimetype
+            return view_func_return, mimetype, 200
         elif isinstance(view_func_return, dict):
             view_func_return = json.dumps(view_func_return)
             mimetype = "application/json"
-            return view_func_return, 200, mimetype
+            return view_func_return, mimetype, 200
         elif isinstance(view_func_return, Response):
             return view_func_return.body, \
-                   view_func_return.status, view_func_return.mimetype
+                   view_func_return.mimetype, view_func_return.status
         else:
             return FEASP_ERROR["HTTP_500"]
 
@@ -707,7 +710,7 @@ class Feasp:
         """
         return _RequestContext(self, environ)
 
-    def make_response(self, body: str, status: int, mimetype: str) -> Response:
+    def make_response(self, body: str, mimetype: str, status: int) -> Response:
         """
           抽象出处理response的过程，以提供更清晰的代码逻辑
         """
@@ -731,9 +734,9 @@ class Feasp:
         with req_ctx:
             request = req_ctx.request
             # -------------------------------------------------------------------------------
-            body, status, mimetype = self.dispatch(request.path, request.method)
+            body, mimetype, status = self.dispatch(request.path, request.method)
             # -------------------------------------------------------------------------------
-            response = self.make_response(body, status, mimetype)
+            response = self.make_response(body, mimetype, status)
             return response(environ, start_response)
 
     def run(self, host: str, port: int) -> None:
@@ -909,12 +912,12 @@ def render_template(filename: str, **context: dict) -> str:
       具体使用见example目录: example/app.py -> index and show_variable
     """
 
-    if filename[0] == "/":
+    if filename[0] == '/':
         filename = filename[1:]
 
     filepath = os.path.join(
         _global_var["user_pkg_abspath"], "templates", filename)
-    with open(filepath, "r", encoding="utf-8") as fp:
+    with open(filepath, 'r', encoding="utf-8") as fp:
         text = fp.read()
     return FeaspTemplate(text, context).render()
 
