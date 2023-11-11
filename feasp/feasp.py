@@ -193,7 +193,7 @@ class Request:
         return url
 
     def __repr__(self) -> str:
-        return f"<{type(self).__name__} {self.method} {self.protocol} {self.path}>"
+        return f"<{type(self).__name__} ReqHeader: {self.method} {self.protocol} {self.path}>"
 
 
 class Response:
@@ -250,7 +250,7 @@ class Response:
         return [self.body.encode("utf-8")]
 
     def __repr__(self) -> str:
-        return f"<{type(self).__name__} {self.mimetype}" \
+        return f"<{type(self).__name__} ResHeader: {self.mimetype}" \
                f" {self.status} {self.reason_phrase[self.status]}>"
 
 
@@ -275,6 +275,9 @@ class LocalProxy:
     def __delitem__(self, key):
         del self._func()[key]
 
+    def __repr__(self):
+        return f"{type(self).__name__} Object: {self._func}"
+
 
 class LocalStack:
     """
@@ -298,6 +301,9 @@ class LocalStack:
     @property
     def top(self):
         return self._local.stack[-1]
+
+    def __repr__(self):
+        return f"{type(self).__name__} Thread: {self._local}"
 
 
 class _RequestContext:
@@ -332,6 +338,9 @@ class _RequestContext:
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_tb is None:
             _request_ctx_stack.pop()
+
+    def __repr__(self):
+        return f"<{type(self).__name__} CtxRequest: {self.request}>"
 
 
 class FeaspTemplate:
@@ -518,7 +527,7 @@ class FeaspTemplate:
         return "".join(self.finally_result).format("".join(result))
 
     def __repr__(self) -> str:
-        return f"<{type(self).__name__} {self.context}>"
+        return f"<{type(self).__name__} Ctx: {self.context}>"
 
 
 class FeaspServer:
@@ -547,7 +556,7 @@ class FeaspServer:
             raise
 
     def __repr__(self) -> str:
-        return f"{type(self).__class__.__name__} {self.host}:{self.port}"
+        return f"{type(self).__name__} Address: {self.host}:{self.port}"
 
 
 class Feasp:
@@ -607,7 +616,7 @@ class Feasp:
         return url_and_func
     
     @property
-    def user_pkg_abspath(self):
+    def user_pkg_abspath(self) -> str:
         """
           让用户可以查看用户程序包的绝对路径
         """
@@ -746,6 +755,9 @@ class Feasp:
         simple_server = FeaspServer(host, port)
         simple_server.run(self.wsgi_apl)
 
+    def __repr__(self):
+        return f"{type(self).__name__} Route: {self.url_func_map}"
+
 
 class SimpleSqlite:
     """
@@ -783,9 +795,6 @@ class SimpleSqlite:
         self.__db_name: str = db_name
         self.__conn = sqlite3.connect(f"{self.__db_name}")
         self.__cursor = self.__conn.cursor()
-
-    def __repr__(self):
-        return f"<SimpleSqlite Database: {self.__db_name}>"
 
     def create_table(self, tb_name: str, colum_name: list[str]) -> None:
         """
@@ -886,6 +895,9 @@ class SimpleSqlite:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.__cursor.close()
         self.__conn.close()
+
+    def __repr__(self):
+        return f"<{type(self).__name__} Database: {self.__db_name}>"
 
 
 def make_response(
